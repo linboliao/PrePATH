@@ -4,6 +4,7 @@ import os
 import time
 
 from torch import nn
+from torchvision import transforms
 
 from create_patches_tumor import visualize_patches
 from datasets.dataset_h5 import Dataset_All_Bags, Whole_Slide_Bag_FP
@@ -16,6 +17,8 @@ import openslide
 import numpy as np
 from multiprocessing import Process
 import glob
+
+from utils.stains import TorchStain
 from wsi_core.Aslide.simple import ImgReader
 from datetime import datetime
 
@@ -39,10 +42,10 @@ class BinaryClassifier(nn.Module):
 
         # 输出层：二分类，输出维度为1（使用Sigmoid激活）或2（使用Softmax）
         # 这里选择输出维度为1，配合BCEWithLogitsLoss或BCELoss
-        layers.append(nn.Linear(prev_dim, 1))
+        # layers.append(nn.Linear(prev_dim, 1))
         # 如果选择输出维度为2，配合CrossEntropyLoss，则注释上一行，取消下一行注释
-        # layers.append(nn.Linear(prev_dim, 2))
-
+        layers.append(nn.Linear(prev_dim, 2))
+        layers.append(nn.Softmax(dim=1))
         self.model = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -123,7 +126,8 @@ def light_compute_w_loader(file_path, wsi, cls_model, model,
             batch = batch.to(device, non_blocking=True)
             features = model(batch)
             output = cls_model(features)
-            predicted = torch.round(torch.sigmoid(output))
+            # predicted = torch.round(torch.sigmoid(output))
+            _, predicted = torch.max(output.data, 1)
             positive_indices = torch.where(predicted.squeeze().cpu() == 1)[0]
             if len(positive_indices):
                 features = features.cpu()
@@ -165,7 +169,7 @@ parser.add_argument('--data_slide_dir', type=str, default=None)
 parser.add_argument('--slide_ext', type=str, default='.svs')
 parser.add_argument('--csv_path', type=str, default=None)
 parser.add_argument('--feat_dir', type=str, default=None)
-parser.add_argument('--batch_size', type=int, default=256)
+parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--custom_downsample', type=int, default=1)
 parser.add_argument('--target_patch_size', type=int, default=-1)
 parser.add_argument('--model', type=str)
@@ -191,6 +195,8 @@ if __name__ == '__main__':
     os.makedirs(args.feat_dir, exist_ok=True)
     os.makedirs(os.path.join(args.feat_dir, 'pt_files', args.model), exist_ok=True)
     os.makedirs(os.path.join(args.feat_dir, 'h5_files', args.model), exist_ok=True)
+    os.makedirs(os.path.join(args.feat_dir, 'masks'), exist_ok=True)
+    os.makedirs(os.path.join(args.feat_dir, 'slides'), exist_ok=True)
     dest_files = os.listdir(os.path.join(args.feat_dir, 'pt_files', args.model))
 
     print('loading model checkpoint:', args.model)
@@ -198,7 +204,11 @@ if __name__ == '__main__':
     print('Device:{}, GPU Count:{}'.format(device.type, torch.cuda.device_count()))
 
     model = get_model(args.model, device, torch.cuda.device_count())
-    custom_transformer = get_custom_transformer(args.model)
+    custom_transformer = transforms.Compose([
+        TorchStain(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    ])
 
     WEIGHT_PATH = '/NAS3/lbliao/Code/MIL_BASELINE/preprocess/ckpts/best_model.pth'
 
@@ -273,9 +283,8 @@ if __name__ == '__main__':
         asset_dict = {'coords': coords}
         save_hdf5_subprocess(output_h5_path, asset_dict=asset_dict)
 
-        wsi_path = os.path.join(args.data_slide_dir, bags_dataset[bag_candidate_idx])
-        mask_path = os.path.join(args.save_dir, f'masks/{slide_id}.png')
-        visualize_patches(wsi_path, coords, mask_path, 512)
+        mask_path = os.path.join(args.feat_dir, f'masks/{slide_id}.png')
+        visualize_patches(slide_file_path, coords, mask_path, 512)
         # clear temp file
         os.remove(output_feature_path + '.partial')
         print('time per slide: {:.1f}'.format(time.time() - one_slide_start))

@@ -206,9 +206,6 @@ if __name__ == '__main__':
         if not os.path.exists(h5_file_path):
             print(h5_file_path, 'does not exist ...')
             continue
-        # elif slide_id + '.pt' in dest_files:
-        #     print('pt file exist, skip {}'.format(slide_id))
-        #     continue
         else:
             exist_idxs.append(bag_candidate_idx)
 
@@ -228,12 +225,6 @@ if __name__ == '__main__':
 
         output_h5_path = os.path.join(args.feat_dir, 'h5_files', args.model, bag_name)
         bag_base, _ = os.path.splitext(bag_name)
-        # output_feature_path = os.path.join(args.feat_dir, 'pt_files', args.model, bag_base + '.pt')
-        #
-        # # skip if '.partial' file exists
-        # if args.ignore_partial == 'no' and os.path.exists(output_feature_path + '.partial'):
-        #     print("Another process is extrating {}".format(output_feature_path))
-        #     continue
 
         one_slide_start = time.time()
         try:
@@ -241,10 +232,6 @@ if __name__ == '__main__':
         except:
             print('Failed to read WSI:', slide_file_path)
             continue
-
-        # # create an temp file, help other processes
-        # with open(output_feature_path + '.partial', 'w') as f:
-        #     f.write("")
 
         custom_transformer = transforms.Compose([
             TorchStain(),
@@ -261,11 +248,7 @@ if __name__ == '__main__':
         save_feature_subprocess(args.feat_dir, base, features, coords)
         print('feature shape:', features.shape)
         print('coords shape:', coords.shape)
-        # asset_dict = {'coords': coords}
-        # save_hdf5_subprocess(output_h5_path, asset_dict=asset_dict)
 
-        # clear temp file
-        # os.remove(output_feature_path + '.partial')
         print('time per slide: {:.1f}'.format(time.time() - one_slide_start))
 
     print('Time used for this dataset:{:.1f}'.format(time.time() - process_start_time))

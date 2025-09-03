@@ -143,7 +143,7 @@ def main(geojson_path, output_h5_path, patch_size=244):
     return patch_coordinates
 
 
-def visualize_patches(wsi_path, coordinates, output_image_path, patch_size=244, max_size=5000, alpha=80):
+def visualize_patches(wsi_path, coordinates, output_image_path, patch_size=244, max_size=1000, alpha=80):
     """
     在WSI缩略图上可视化提取的patch位置
     """
@@ -194,6 +194,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     os.makedirs(os.path.join(args.save_dir, 'patches'), exist_ok=True)
     os.makedirs(os.path.join(args.save_dir, 'masks'), exist_ok=True)
+    os.makedirs(os.path.join(args.save_dir, 'slides'), exist_ok=True)
 
     wsis = os.listdir(args.wsi_dir)
     for wsi in wsis:
@@ -211,4 +212,5 @@ if __name__ == "__main__":
             continue
         mask_path = os.path.join(args.save_dir, f'masks/{base}.jpg')
         coords = main(geojson_path, h5_path, 512)
-        visualize_patches(wsi_path, coords, mask_path)
+        if args.vis:
+            visualize_patches(wsi_path, coords, mask_path)
