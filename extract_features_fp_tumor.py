@@ -42,15 +42,15 @@ class BinaryClassifier(nn.Module):
 
         # 输出层：二分类，输出维度为1（使用Sigmoid激活）或2（使用Softmax）
         # 这里选择输出维度为1，配合BCEWithLogitsLoss或BCELoss
-        # layers.append(nn.Linear(prev_dim, 1))
+        layers.append(nn.Linear(prev_dim, 1))
+        layers.append(nn.Sigmoid())
         # 如果选择输出维度为2，配合CrossEntropyLoss，则注释上一行，取消下一行注释
-        layers.append(nn.Linear(prev_dim, 2))
-        layers.append(nn.Softmax(dim=1))
+        # layers.append(nn.Linear(prev_dim, 2))
+        # layers.append(nn.Sigmoid(dim=1))
         self.model = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.model(x)
-
 
 
 def get_wsi_handle(wsi_path):
@@ -126,9 +126,9 @@ def light_compute_w_loader(file_path, wsi, cls_model, model,
             batch = batch.to(device, non_blocking=True)
             features = model(batch)
             output = cls_model(features)
-            # predicted = torch.round(torch.sigmoid(output))
-            _, predicted = torch.max(output.data, 1)
-            positive_indices = torch.where(predicted.squeeze().cpu() == 1)[0]
+            threshold_tensor = torch.tensor(0.5441, device=output.device)  # 阈值应根据验证集性能确定
+            predicted = (output >= threshold_tensor).to(torch.int64).reshape(-1).cpu()
+            positive_indices = torch.where(predicted == 1)[0]
             if len(positive_indices):
                 features = features.cpu()
                 filtered_coords = coords[positive_indices]
@@ -169,7 +169,7 @@ parser.add_argument('--data_slide_dir', type=str, default=None)
 parser.add_argument('--slide_ext', type=str, default='.svs')
 parser.add_argument('--csv_path', type=str, default=None)
 parser.add_argument('--feat_dir', type=str, default=None)
-parser.add_argument('--batch_size', type=int, default=128)
+parser.add_argument('--batch_size', type=int, default=96)
 parser.add_argument('--custom_downsample', type=int, default=1)
 parser.add_argument('--target_patch_size', type=int, default=-1)
 parser.add_argument('--model', type=str)
@@ -210,7 +210,7 @@ if __name__ == '__main__':
         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     ])
 
-    WEIGHT_PATH = '/NAS3/lbliao/Code/MIL_BASELINE/preprocess/ckpts/best_model.pth'
+    WEIGHT_PATH = '/data2/lbliao/Code/MIL_BASELINE/preprocess/best_model.pth'
 
     print("初始化模型...")
     cls_model = BinaryClassifier().to(device)

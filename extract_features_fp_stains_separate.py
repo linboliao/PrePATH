@@ -156,7 +156,7 @@ parser.add_argument('--data_slide_dir', type=str, default="")
 parser.add_argument('--slide_ext', type=str, default='.svs')
 parser.add_argument('--csv_path', type=str, default="")
 parser.add_argument('--feat_dir', type=str, default="")
-parser.add_argument('--batch_size', type=int, default=64)
+parser.add_argument('--batch_size', type=int, default=96)
 parser.add_argument('--custom_downsample', type=int, default=1)
 parser.add_argument('--target_patch_size', type=int, default=-1)
 parser.add_argument('--model', type=str, default='uni')
@@ -188,7 +188,6 @@ if __name__ == '__main__':
     print('Device:{}, GPU Count:{}'.format(device.type, torch.cuda.device_count()))
 
     model = get_model(args.model, device, torch.cuda.device_count())
-    custom_transformer = get_custom_transformer(args.model)
 
     total = len(bags_dataset)
     print('Total number of WSIs:', total)
