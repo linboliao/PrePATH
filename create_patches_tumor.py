@@ -146,14 +146,14 @@ def main(geojson_path, output_h5_path, patch_size=244):
     return patch_coordinates
 
 
-def visualize_patches(wsi_path, coordinates, output_image_path, patch_size=244, max_size=1000, alpha=80):
+def visualize_patches(wsi_path, coordinates, output_image_path, patch_size=244, alpha=80):
     """
     在WSI缩略图上可视化提取的patch位置
     """
     slide = get_wsi_handle(wsi_path)
 
     # 生成缩略图
-    thumb = slide.get_thumbnail((max_size, max_size))
+    thumb = slide.read_region((0,0), -1, slide.level_dimensions[-1])
     thumb.save(output_image_path.replace('/masks/', '/slides/'))
     # 转换为RGBA模式以支持透明度
     thumb = thumb.convert('RGBA')
