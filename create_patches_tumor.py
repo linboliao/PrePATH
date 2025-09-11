@@ -6,7 +6,10 @@ import h5py
 import numpy as np
 from PIL import Image, ImageDraw
 from shapely.geometry import Polygon, Point
+from pathlib import Path
 import openslide
+
+from wsi_core.Aslide.simple import ImgReader
 
 
 def get_wsi_handle(wsi_path):
@@ -171,7 +174,7 @@ def visualize_patches(wsi_path, coordinates, output_image_path, patch_size=244, 
         rect_h = int(patch_size * scale_y)
 
         # 绘制半透明矩形
-        draw.rectangle([rect_x, rect_y, rect_x + rect_w, rect_y + rect_h], fill=(0, 255, 0, alpha))
+        draw.rectangle([rect_x, rect_y, rect_x + rect_w, rect_y + rect_h], fill=(255, 0, 0, alpha))
 
     # 将透明图层与原始图像合并
     result = Image.alpha_composite(thumb, overlay)
@@ -185,9 +188,10 @@ def visualize_patches(wsi_path, coordinates, output_image_path, patch_size=244, 
 
 
 parser = argparse.ArgumentParser(description='create patches')
-parser.add_argument('--wsi_dir', type=str, default=r'/NAS4/llb/协和医院结直肠癌数据/slides')
-parser.add_argument('--label_dir', type=str, default=r'/NAS3/lbliao/Data/CRC/协和/cls/geojson/tumor')
-parser.add_argument('--save_dir', type=str, default=r'/NAS3/lbliao/Data/CRC/协和/tumor_feat')
+parser.add_argument('--wsi_dir', type=str, default=r'')
+parser.add_argument('--label_dir', type=str, default=r'')
+parser.add_argument('--save_dir', type=str, default=r'/')
+parser.add_argument('--slide_ext', type=str, default=r'')
 parser.add_argument('--vis', default=False, action='store_true')
 
 if __name__ == "__main__":
@@ -196,21 +200,24 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(args.save_dir, 'masks'), exist_ok=True)
     os.makedirs(os.path.join(args.save_dir, 'slides'), exist_ok=True)
 
-    wsis = os.listdir(args.wsi_dir)
-    for wsi in wsis:
-        base = os.path.splitext(wsi)[0]
-        wsi_path = os.path.join(args.wsi_dir, wsi)
+    wsi_dir = Path(args.wsi_dir)
+    wsi_paths = []
+    for ext in args.slide_ext.split(';'):
+        wsi_paths += list(wsi_dir.rglob(f'*.{ext}'))
+
+    for wsi_path in wsi_paths:
+        base = wsi_path.stem
         geojson_path = os.path.join(args.label_dir, f'{base}.geojson')
         if not os.path.exists(geojson_path):
             geojson_path = os.path.join(args.label_dir, f'{base.replace("-", " ")}.geojson')
             if not os.path.exists(geojson_path):
-                print(f'{wsi}找不到对应的geojson')
+                print(f'{base}找不到对应的geojson')
                 continue
         h5_path = os.path.join(args.save_dir, f'patches/{base}.h5')
         if os.path.exists(h5_path):
-            print(f'{wsi}已经处理')
+            print(f'{base}已经处理')
             continue
         mask_path = os.path.join(args.save_dir, f'masks/{base}.jpg')
         coords = main(geojson_path, h5_path, 512)
         if args.vis:
-            visualize_patches(wsi_path, coords, mask_path)
+            visualize_patches(str(wsi_path), coords, mask_path)

@@ -244,8 +244,19 @@ if __name__ == '__main__':
                                                   custom_transformer=custom_transformer)
 
         # save results
+        # TODO 以文件名作为 patch 特征标签
+        import pandas as pd
+
+        df = pd.read_csv(csv_path)
+        label = df[df['slide_id'] == slide_id]['label'].values[0]
+        if label == 1:
+            save = os.path.join(args.feat_dir, 'TUM')
+
+        else:
+            save = os.path.join(args.feat_dir, 'NORM')
+        os.makedirs(save, exist_ok=True)
         base = os.path.splitext(bag_name)[0]
-        save_feature_subprocess(args.feat_dir, base, features, coords)
+        save_feature_subprocess(save, base, features, coords)
         print('feature shape:', features.shape)
         print('coords shape:', coords.shape)
 
