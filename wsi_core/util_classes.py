@@ -72,13 +72,19 @@ class isInContourV3_Easy(Contour_Checking_fn):
 		self.cont = contour
 		self.patch_size = patch_size
 		self.shift = int(patch_size//2*center_shift)
-	def __call__(self, pt): 
+		self.shift2 = int(patch_size//2)
+	def __call__(self, pt):
 		center = (pt[0]+self.patch_size//2, pt[1]+self.patch_size//2)
 		if self.shift > 0:
-			all_points = [(center[0]-self.shift, center[1]-self.shift),
+			all_points = [(center[0], center[1]),
+						  (center[0] - self.shift, center[1] - self.shift),
 						  (center[0]+self.shift, center[1]+self.shift),
 						  (center[0]+self.shift, center[1]-self.shift),
-						  (center[0]-self.shift, center[1]+self.shift)
+						  (center[0]-self.shift, center[1]+self.shift),
+						  (center[0] - self.shift2, center[1] - self.shift2),
+						  (center[0] + self.shift2, center[1] + self.shift2),
+						  (center[0] + self.shift2, center[1] - self.shift2),
+						  (center[0] - self.shift2, center[1] + self.shift2)
 						  ]
 		else:
 			all_points = [center]
