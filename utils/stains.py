@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import cv2
 import numpy as np
 import staintools
@@ -8,7 +10,8 @@ from matplotlib import pyplot as plt
 from torchvision.transforms import transforms
 from wsi_normalizer import TorchVahadaneNormalizer, imread
 
-REF_IMG_PATH = '/NAS3/lbliao/Code/PrePATH/utils/TUM-AEKDYIAK.tif'
+script_dir = Path(__file__).resolve().parent
+REF_IMG_PATH = str(script_dir / "TUM-AEKDYIAK.tif")
 
 
 def visualize(org_img, stain_img):
