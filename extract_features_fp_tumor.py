@@ -106,9 +106,10 @@ def light_compute_w_loader(file_path, wsi, cls_model, model,
     """
     dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, pretrained=pretrained, custom_transforms=custom_transformer,
                                  custom_downsample=custom_downsample, target_patch_size=target_patch_size, fast_read=True)
-    kwargs = {'num_workers': 8, 'pin_memory': True} if device.type == "cuda" else {}
+    # 当数据加载时出出现图片损坏时，将 num_workers 设置为 0
+    kwargs = {'num_workers': 0, 'pin_memory': True} if device.type == "cuda" else {}
     print('Data Loader args:', kwargs)
-    loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=16)
+    loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features)#, prefetch_factor=16)
 
     if verbose > 0:
         print('processing {}: total of {} batches'.format(file_path, len(loader)))
