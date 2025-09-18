@@ -1,18 +1,25 @@
 """
 https://huggingface.co/bioptimus/H-optimus-0
 """
+from pathlib import Path
+
 from huggingface_hub import login
 import torch
-import timm 
+import timm
 from torchvision import transforms
 
+script_dir = Path(__file__).resolve().parent
+token_path = str(script_dir / "token")
+with open(token_path, 'r') as f:
+    token = f.read().strip()
+login(token=token)
 
 def get_trans():
     transform = transforms.Compose([
         transforms.Resize(224, interpolation=transforms.InterpolationMode.BICUBIC),
         transforms.ToTensor(),
         transforms.Normalize(
-            mean=(0.707223, 0.578729, 0.703617), 
+            mean=(0.707223, 0.578729, 0.703617),
             std=(0.211883, 0.230117, 0.177517)
         ),
     ])
@@ -25,17 +32,19 @@ def get_model(device):
     ).to(device)
 
     model.eval()
+
     def func(img):
         # We recommend using mixed precision for faster inference.
         with torch.autocast(device_type="cuda", dtype=torch.float16):
             with torch.inference_mode():
                 features = model(img)
         return features
+
     return func
+
 
 if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = get_model(device)
     print(model)
-    print(model(torch.rand((1, 3, 224, 224)).to(device
-    )).shape)
+    print(model(torch.rand((1, 3, 224, 224)).to(device)).shape)
