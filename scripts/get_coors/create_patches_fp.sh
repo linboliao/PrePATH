@@ -1,9 +1,9 @@
 # The coordinates of the patches are saved, you can change the path to any directory you want.
-save_dir="/NAS3/lbliao/Data/CRC/协和"
+save_dir="/NAS3/lbliao/Data/CRC/"
 # The directory where the WSI files are stored, you can change it to any directory you want.
-wsi_dir="/NAS4/llb/协和医院结直肠癌数据/slides"
+wsi_dir="/NAS4/llb/中日友好医院结直肠癌数据/sdpc"
 # The WSI format, you can set it based on the format of your WSI
-wsi_format="ndpi;kfb"
+wsi_format="sdpc"
 # The log file name, you can change it to any name you want.
 log_name="SAL.log"
 

@@ -1,3 +1,5 @@
+import traceback
+
 import torch
 import os
 import time
@@ -24,6 +26,7 @@ from datetime import datetime
 import warnings
 
 warnings.filterwarnings('ignore')
+
 
 class BinaryClassifier(nn.Module):
     def __init__(self, input_dim=1024, hidden_dims=[512, 256], dropout_rate=0.1):
@@ -107,9 +110,9 @@ def light_compute_w_loader(file_path, wsi, cls_model, model,
     dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, pretrained=pretrained, custom_transforms=custom_transformer,
                                  custom_downsample=custom_downsample, target_patch_size=target_patch_size, fast_read=True)
     # 当数据加载时出出现图片损坏时，将 num_workers 设置为 0
-    kwargs = {'num_workers': 0, 'pin_memory': True} if device.type == "cuda" else {}
+    kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
     print('Data Loader args:', kwargs)
-    loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features)#, prefetch_factor=16)
+    loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
 
     if verbose > 0:
         print('processing {}: total of {} batches'.format(file_path, len(loader)))
@@ -117,8 +120,9 @@ def light_compute_w_loader(file_path, wsi, cls_model, model,
     features_list = []
     coords_list = []
     _start_time = time.time()
-    for count, (batch, coords) in enumerate(loader):
-        with torch.no_grad():
+
+    with torch.no_grad():
+        for count, (batch, coords) in enumerate(loader):
             if count % print_every == 0:
                 batch_time = time.time()
                 print('batch {}/{}, {} files processed, used_time: {} s'.format(
@@ -138,7 +142,8 @@ def light_compute_w_loader(file_path, wsi, cls_model, model,
                 if filtered_coords.ndim == 1:
                     filtered_coords = np.expand_dims(filtered_coords, axis=0)
                 coords_list.append(filtered_coords)
-
+    if not features_list:
+        return [], []
     features = torch.cat(features_list, dim=0)
     coords = np.concatenate(coords_list, axis=0)
     return features, coords
@@ -210,7 +215,6 @@ if __name__ == '__main__':
         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     ])
 
-
     print("初始化模型...")
     cls_model = BinaryClassifier().to(device)
     cls_model.load_state_dict(torch.load(args.ckpt, map_location=device))
@@ -276,16 +280,21 @@ if __name__ == '__main__':
                                                   custom_transformer=custom_transformer)
 
         # save results
+        if len(features) == 0:
+            continue
         save_feature_subprocess(output_feature_path, features)
         print('feature shape:', features.shape)
         print('coords shape:', coords.shape)
         asset_dict = {'coords': coords}
         save_hdf5_subprocess(output_h5_path, asset_dict=asset_dict)
-
-        mask_path = os.path.join(args.feat_dir, f'masks/{slide_id}.png')
-        visualize_patches(slide_file_path, coords, mask_path, 512)
+        try:
+            mask_path = os.path.join(args.feat_dir, f'masks/{slide_id}.png')
+            visualize_patches(slide_file_path, coords, mask_path, 512)
+        except:
+            traceback.print_exc()
         # clear temp file
-        os.remove(output_feature_path + '.partial')
+        if os.path.exists(output_feature_path + '.partial'):
+            os.remove(output_feature_path + '.partial')
         print('time per slide: {:.1f}'.format(time.time() - one_slide_start))
 
     print('Time used for this dataset:{:.1f}'.format(time.time() - process_start_time))
