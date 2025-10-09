@@ -15,6 +15,7 @@ from wsi_core.Aslide.aslide import Slide
 
 Image.MAX_IMAGE_PIXELS = 20000000000
 
+
 class WholeSlideImage(object):
     def __init__(self, path):
         """
@@ -153,7 +154,7 @@ class WholeSlideImage(object):
             img_otsu = cv2.morphologyEx(img_otsu, cv2.MORPH_CLOSE, kernel)
 
         scale = self.level_downsamples[seg_level]
-        scaled_ref_patch_area = int(ref_patch_size**2 / (scale[0] * scale[1]))
+        scaled_ref_patch_area = int(ref_patch_size ** 2 / (scale[0] * scale[1]))
         filter_params = filter_params.copy()
         filter_params["a_t"] = filter_params["a_t"] * scaled_ref_patch_area
         filter_params["a_h"] = filter_params["a_h"] * scaled_ref_patch_area
@@ -176,7 +177,8 @@ class WholeSlideImage(object):
         self.contours_tissue = [self.contours_tissue[i] for i in contour_ids]
         self.holes_tissue = [self.holes_tissue[i] for i in contour_ids]
 
-    def visWSI(self, vis_level=0, color=(0, 255, 0), hole_color=(0, 0, 255), annot_color=(255, 0, 0), line_thickness=250, max_size=None, top_left=None, bot_right=None, custom_downsample=1, view_slide_only=False, number_contours=False, seg_display=True, annot_display=True):
+    def visWSI(self, vis_level=0, color=(0, 255, 0), hole_color=(0, 0, 255), annot_color=(255, 0, 0), line_thickness=250, max_size=None, top_left=None, bot_right=None, custom_downsample=1, view_slide_only=False, number_contours=False, seg_display=True,
+               annot_display=True):
 
         downsample = self.level_downsamples[vis_level]
         scale = [1 / downsample[0], 1 / downsample[1]]
@@ -313,7 +315,8 @@ class WholeSlideImage(object):
                     if isBlackPatch(np.array(patch_PIL), rgbThresh=black_thresh) or isWhitePatch(np.array(patch_PIL), satThresh=white_thresh):
                         continue
 
-                patch_info = {"x": x // (patch_downsample[0] * custom_downsample), "y": y // (patch_downsample[1] * custom_downsample), "cont_idx": cont_idx, "patch_level": patch_level, "downsample": self.level_downsamples[patch_level], "downsampled_level_dim": tuple(np.array(self.level_dim[patch_level]) // custom_downsample), "level_dim": self.level_dim[patch_level], "patch_PIL": patch_PIL, "name": self.name, "save_path": save_path}
+                patch_info = {"x": x // (patch_downsample[0] * custom_downsample), "y": y // (patch_downsample[1] * custom_downsample), "cont_idx": cont_idx, "patch_level": patch_level, "downsample": self.level_downsamples[patch_level],
+                              "downsampled_level_dim": tuple(np.array(self.level_dim[patch_level]) // custom_downsample), "level_dim": self.level_dim[patch_level], "patch_PIL": patch_PIL, "name": self.name, "save_path": save_path}
 
                 yield patch_info
 
@@ -321,8 +324,22 @@ class WholeSlideImage(object):
 
     @staticmethod
     def isInHoles(holes, pt, patch_size):
+        center = (pt[0] + patch_size / 2, pt[1] + patch_size / 2)
+        shift = int(patch_size // 2)
+        all_points = [(center[0], center[1]),
+                      (center[0] - shift, center[1] - shift),
+                      (center[0] + shift, center[1] + shift),
+                      (center[0] + shift, center[1] - shift),
+                      (center[0] - shift, center[1] + shift)
+                      ]
         for hole in holes:
-            if cv2.pointPolygonTest(hole, (pt[0] + patch_size / 2, pt[1] + patch_size / 2), False) > 0:
+            all_points_inside = True
+            for point in all_points:
+                if cv2.pointPolygonTest(hole, point, False) < 0:
+                    all_points_inside = False
+                    break
+
+            if all_points_inside:
                 return 1
 
         return 0
@@ -450,7 +467,8 @@ class WholeSlideImage(object):
         if len(results) > 1:
             asset_dict = {"coords": results}
 
-            attr = {"patch_size": patch_size, "patch_level": patch_level, "downsample": self.level_downsamples[patch_level], "downsampled_level_dim": tuple(np.array(self.level_dim[patch_level])), "level_dim": self.level_dim[patch_level], "name": self.name, "save_path": save_path}  # To be considered...
+            attr = {"patch_size": patch_size, "patch_level": patch_level, "downsample": self.level_downsamples[patch_level], "downsampled_level_dim": tuple(np.array(self.level_dim[patch_level])), "level_dim": self.level_dim[patch_level], "name": self.name,
+                    "save_path": save_path}  # To be considered...
 
             attr_dict = {"coords": attr}
             return asset_dict, attr_dict
@@ -465,7 +483,8 @@ class WholeSlideImage(object):
         else:
             return None
 
-    def visHeatmap(self, scores, coords, vis_level=-1, top_left=None, bot_right=None, patch_size=(256, 256), blank_canvas=False, canvas_color=(220, 20, 50), alpha=0.4, blur=False, overlap=0.0, segment=True, use_holes=True, convert_to_percentiles=False, binarize=False, thresh=0.5, max_size=None, custom_downsample=1, cmap="coolwarm"):
+    def visHeatmap(self, scores, coords, vis_level=-1, top_left=None, bot_right=None, patch_size=(256, 256), blank_canvas=False, canvas_color=(220, 20, 50), alpha=0.4, blur=False, overlap=0.0, segment=True, use_holes=True, convert_to_percentiles=False,
+                   binarize=False, thresh=0.5, max_size=None, custom_downsample=1, cmap="coolwarm"):
         """
         Args:
             scores (numpy array of float): Attention scores
@@ -557,9 +576,9 @@ class WholeSlideImage(object):
             else:
                 score = 0.0
             # accumulate attention
-            overlay[coord[1] : coord[1] + patch_size[1], coord[0] : coord[0] + patch_size[0]] += score
+            overlay[coord[1]: coord[1] + patch_size[1], coord[0]: coord[0] + patch_size[0]] += score
             # accumulate counter
-            counter[coord[1] : coord[1] + patch_size[1], coord[0] : coord[0] + patch_size[0]] += 1
+            counter[coord[1]: coord[1] + patch_size[1], coord[0]: coord[0] + patch_size[0]] += 1
 
         if binarize:
             print("\nbinarized tiles based on cutoff of {}".format(threshold))
@@ -605,17 +624,17 @@ class WholeSlideImage(object):
             if score >= threshold:
 
                 # attention block
-                raw_block = overlay[coord[1] : coord[1] + patch_size[1], coord[0] : coord[0] + patch_size[0]]
+                raw_block = overlay[coord[1]: coord[1] + patch_size[1], coord[0]: coord[0] + patch_size[0]]
 
                 # image block (either blank canvas or orig image)
-                img_block = img[coord[1] : coord[1] + patch_size[1], coord[0] : coord[0] + patch_size[0]].copy()
+                img_block = img[coord[1]: coord[1] + patch_size[1], coord[0]: coord[0] + patch_size[0]].copy()
 
                 # color block (cmap applied to attention block)
                 color_block = (cmap(raw_block) * 255)[:, :, :3].astype(np.uint8)
 
                 if segment:
                     # tissue mask block
-                    mask_block = tissue_mask[coord[1] : coord[1] + patch_size[1], coord[0] : coord[0] + patch_size[0]]
+                    mask_block = tissue_mask[coord[1]: coord[1] + patch_size[1], coord[0]: coord[0] + patch_size[0]]
                     # copy over only tissue masked portion of color block
                     img_block[mask_block] = color_block[mask_block]
                 else:
@@ -623,7 +642,7 @@ class WholeSlideImage(object):
                     img_block = color_block
 
                 # rewrite image block
-                img[coord[1] : coord[1] + patch_size[1], coord[0] : coord[0] + patch_size[0]] = img_block.copy()
+                img[coord[1]: coord[1] + patch_size[1], coord[0]: coord[0] + patch_size[0]] = img_block.copy()
 
         # return Image.fromarray(img) #overlay
         print("Done")
