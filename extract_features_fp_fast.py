@@ -1,7 +1,7 @@
 import os
 
 os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
-os.environ['HF_HOME'] = '/NAS2/Data1/lbliao/Code/PrePATH/models/ckpts/huggingface'
+os.environ['HF_HOME'] = '/NAS2/Data1/lbliao/Code/PrePATH/models/ckpts/huggingface-195'
 
 import torch
 import os
@@ -78,9 +78,13 @@ def light_compute_w_loader(file_path, wsi, model,
     """
     dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, pretrained=pretrained, custom_transforms=custom_transformer,
                                  custom_downsample=custom_downsample, target_patch_size=target_patch_size, fast_read=True)
-    kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
+    if wsi._filename.endswith('.kfb'):
+        kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
+        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
+    elif wsi._filename.endswith('.svs'):
+        kwargs = {'num_workers': 16, 'pin_memory': True} if device.type == "cuda" else {}
+        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=32)
     print('Data Loader args:', kwargs)
-    loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
 
     if verbose > 0:
         print('processing {}: total of {} batches'.format(file_path, len(loader)))
@@ -168,9 +172,6 @@ if __name__ == '__main__':
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Device:{}, GPU Count:{}'.format(device.type, torch.cuda.device_count()))
 
-    model = get_model(args.model, device, torch.cuda.device_count())
-    custom_transformer = get_custom_transformer(args.model)
-
     total = len(bags_dataset)
     print('Total number of WSIs:', total)
     # obtain slide_id
@@ -194,7 +195,9 @@ if __name__ == '__main__':
             exist_idxs.append(bag_candidate_idx)
 
     print('WSIs need to be processed: {} of {}'.format(len(exist_idxs), total))
-
+    if exist_idxs:
+        model = get_model(args.model, device, torch.cuda.device_count())
+        custom_transformer = get_custom_transformer(args.model)
     for index, bag_candidate_idx in enumerate(exist_idxs):
         slide_id = get_slide_id(bag_candidate_idx)
         bag_name = slide_id + '.h5'

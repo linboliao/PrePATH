@@ -1,4 +1,6 @@
 # internal imports
+import traceback
+
 from wsi_core.WholeSlideImage import WholeSlideImage
 from wsi_core.wsi_utils import StitchCoords
 from wsi_core.batch_process_utils import initialize_df
@@ -545,4 +547,7 @@ if __name__ == "__main__":
         fn = mp_seg_and_patch
     else:
         fn = seg_and_patch
-    seg_times, patch_times = fn(**directories, **parameters, patch_size=args.patch_size, step_size=args.step_size, seg=args.seg, use_default_params=False, save_mask=True, stitch=args.stitch, patch_level=args.patch_level, patch=args.patch, process_list=process_list, auto_skip=args.no_auto_skip, wsi_format=wsi_format)
+    try:
+        seg_times, patch_times = fn(**directories, **parameters, patch_size=args.patch_size, step_size=args.step_size, seg=args.seg, use_default_params=False, save_mask=True, stitch=args.stitch, patch_level=args.patch_level, patch=args.patch, process_list=process_list, auto_skip=args.no_auto_skip, wsi_format=wsi_format)
+    except TypeError as e:
+        traceback.print_exc()
