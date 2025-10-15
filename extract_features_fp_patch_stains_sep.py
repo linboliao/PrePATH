@@ -5,7 +5,7 @@ import traceback
 from datetime import datetime
 
 from torch.utils.data import DataLoader, Dataset
-from models import get_model
+from models import get_model, get_custom_transformer
 
 import argparse
 from multiprocessing import Process
@@ -17,6 +17,8 @@ import torchvision.transforms as transforms
 from tqdm import tqdm
 import multiprocessing as mp
 import time
+
+from utils.stains import TorchStain
 
 """
     从NCT 图片上基于UNI提取特征
@@ -168,17 +170,13 @@ if __name__ == '__main__':
     print('Total number of Images:')
     print('Time:', datetime.now().strftime('"%Y-%m-%d, %H:%M:%S"'))
 
-    custom_transformer = transforms.Compose([
-        # TorchStain(), # NCT 数据做过染色归一化
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-    ])
+    # custom_transformer = transforms.Compose([TorchStain()] + get_custom_transformer(args.model).transforms)
+    custom_transformer = get_custom_transformer(args.model)
 
 
     def collate_features(batch):
         img = torch.stack([item[0] for item in batch], dim=0)
-        path = [item[1] for item in batch]  # 直接返回路径列表
+        path = [item[1] for item in batch]
         assert len(img.shape) == 4, "img shape is wrong, please check"
         return [img, path]
 

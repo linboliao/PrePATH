@@ -6,6 +6,7 @@ from datetime import datetime
 from multiprocessing import Process
 
 import numpy as np
+import pandas as pd
 import openslide
 import torch
 from PIL import Image
@@ -166,9 +167,6 @@ parser.add_argument('--device', type=int, default=0)
 
 parser.add_argument('--ignore_partial', default='yes', type=str)
 
-# Histlogy-pretrained MAE setting
-# parser.add_argument('--mae_checkpoint', type=str, default=None, help='path to pretrained mae checkpoint')
-
 args = parser.parse_args()
 
 if __name__ == '__main__':
@@ -232,11 +230,7 @@ if __name__ == '__main__':
             print('Failed to read WSI:', slide_file_path)
             continue
 
-        custom_transformer = transforms.Compose([
-            TorchStain(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-        ])
+        custom_transformer = transforms.Compose([TorchStain()] + get_custom_transformer(args.model).transforms)
         features, coords = light_compute_w_loader(h5_file_path, wsi,
                                                   model=model, batch_size=args.batch_size, verbose=1, print_every=20,
                                                   custom_downsample=args.custom_downsample, target_patch_size=args.target_patch_size,
@@ -244,7 +238,7 @@ if __name__ == '__main__':
 
         # save results
         # TODO 以文件名作为 patch 特征标签
-        import pandas as pd
+
 
         df = pd.read_csv(csv_path)
         label = df[df['slide_id'] == slide_id]['label'].values[0]

@@ -34,10 +34,10 @@ class PatchDataset(Dataset):
         self.h5_path = h5_path
         self.transform = transform
         self.load_to_memory = load_to_memory
-        
+
         # Open the file to read metadata
         with h5py.File(h5_path, 'r') as h5_file:
-            self.num_samples = len(h5_file['patches'])            
+            self.num_samples = len(h5_file['patches'])
             # Optionally load all data to memory
             if load_to_memory:
                 # Load JPEG bytes and decode to images
@@ -49,14 +49,14 @@ class PatchDataset(Dataset):
             else:
                 self.patches = None
                 self.coords = None
-    
+
     def __len__(self):
         return self.num_samples
-    
+
     def __getitem__(self, index):
         if index >= len(self):
             raise IndexError
-            
+
         if self.load_to_memory:
             img = self.patches[index]
         else:
@@ -65,30 +65,30 @@ class PatchDataset(Dataset):
                 # Decode JPEG bytes to image
                 jpeg_bytes = bytes(h5_file['patches'][index])
                 img = Image.open(io.BytesIO(jpeg_bytes))
-        
+
         # Apply transform if specified
         if self.transform is not None:
             img = self.transform(img)
         return img
-    
+
 
 class Dataset_All_Bags(Dataset):
 
-	def __init__(self, csv_path):
-		self.df = pd.read_csv(csv_path, dtype={'case_id': str, 'slide_id': str})
-	
-	def __len__(self):
-		return len(self.df)
+    def __init__(self, csv_path):
+        self.df = pd.read_csv(csv_path, dtype={'case_id': str, 'slide_id': str})
 
-	def __getitem__(self, idx):
-		return self.df['slide_id'][idx]
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        return self.df['slide_id'][idx]
 
 
 def save_feature(path, feature):
     s = time.time()
     torch.save(feature, path)
     e = time.time()
-    print('Feature is sucessfully saved at: {}, cost: {:.1f} s'.format(path, e-s))
+    print('Feature is sucessfully saved at: {}, cost: {:.1f} s'.format(path, e - s))
 
 
 def save_feature_subprocess(path, feature):
@@ -98,11 +98,10 @@ def save_feature_subprocess(path, feature):
 
 
 def light_compute_w_loader(loader, model, print_every=20):
-
     features_list = []
     _start_time = time.time()
     for count, batch in enumerate(loader):
-        with torch.no_grad():	
+        with torch.no_grad():
             if count % print_every == 0:
                 batch_time = time.time()
                 print('batch {}/{}, {} files processed, used_time: {} s'.format(
@@ -125,16 +124,15 @@ parser.add_argument('--no_auto_skip', default=False, action='store_true')
 parser.add_argument('--model', type=str)
 args = parser.parse_args()
 
-
 if __name__ == '__main__':
     process_start_time = time.time()
-    
+
     csv_path = args.csv_path
     if csv_path is None:
         raise NotImplementedError
 
     bags_dataset = Dataset_All_Bags(csv_path)
-    
+
     os.makedirs(args.feat_dir, exist_ok=True)
     os.makedirs(os.path.join(args.feat_dir, 'pt_files', args.model), exist_ok=True)
     os.makedirs(os.path.join(args.feat_dir, 'h5_files', args.model), exist_ok=True)
@@ -148,42 +146,42 @@ if __name__ == '__main__':
     custom_transformer = get_custom_transformer(args.model)
 
     total = len(bags_dataset)
-        
+
     # check the exists wsi
     exist_idxs = []
     for bag_candidate_idx in range(total):
         slide_id = bags_dataset[bag_candidate_idx]
-        
-        if not args.no_auto_skip and slide_id+'.pt' in dest_files:
+
+        if not args.no_auto_skip and slide_id + '.pt' in dest_files:
             print('skipped {}'.format(slide_id))
-            continue 
+            continue
         else:
             exist_idxs.append(bag_candidate_idx)
 
     for index, bag_candidate_idx in enumerate(exist_idxs):
         slide_id = bags_dataset[bag_candidate_idx]
-        
+
         print('\nprogress: {}/{}, slide_id: {}'.format(bag_candidate_idx, len(exist_idxs), slide_id))
         image_h5_dir = args.image_h5_dir
-        
-        output_feature_path = os.path.join(args.feat_dir, 'pt_files', args.model, slide_id+'.pt')
-        image_h5_path = os.path.join(image_h5_dir, slide_id+'.h5')
-        
+
+        output_feature_path = os.path.join(args.feat_dir, 'pt_files', args.model, slide_id + '.pt')
+        image_h5_path = os.path.join(image_h5_dir, slide_id + '.h5')
+
         one_slide_start = time.time()
         # init dataset
         patch_dataset = PatchDataset(image_h5_path, transform=custom_transformer, load_to_memory=True)
         loader = DataLoader(patch_dataset, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
         # create an temp file, help other processes
-        with open(output_feature_path+'.partial', 'w') as f:
+        with open(output_feature_path + '.partial', 'w') as f:
             f.write("")
-            
+
         features = light_compute_w_loader(loader=loader, model=model)
-        #save results
+        # save results
         save_feature_subprocess(output_feature_path, features)
         print('feature shape:', features.shape)
-        os.remove(output_feature_path+'.partial')
+        os.remove(output_feature_path + '.partial')
         print('time per slide: {:.1f}'.format(time.time() - one_slide_start))
-        
+
     print('Extracting end!')
     print('Time used for this dataset:{:.1f}'.format(time.time() - process_start_time))

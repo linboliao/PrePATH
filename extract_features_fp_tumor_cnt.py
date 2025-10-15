@@ -1,11 +1,14 @@
-import os
+import traceback
 
-os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
-os.environ['HF_HOME'] = '/NAS2/Data1/lbliao/Code/PrePATH/models/ckpts/huggingface'
-
+import pandas as pd
 import torch
 import os
 import time
+
+from torch import nn
+from torchvision import transforms
+
+from create_patches_tumor import visualize_patches
 from datasets.dataset_h5 import Dataset_All_Bags, Whole_Slide_Bag_FP
 from torch.utils.data import DataLoader
 from models import get_custom_transformer, get_model
@@ -16,12 +19,41 @@ import openslide
 import numpy as np
 from multiprocessing import Process
 import glob
+
+from utils.stains import TorchStain
 from wsi_core.Aslide.simple import ImgReader
 from datetime import datetime
 
 import warnings
 
 warnings.filterwarnings('ignore')
+
+
+class BinaryClassifier(nn.Module):
+    def __init__(self, input_dim=1536, hidden_dims=[512, 256], dropout_rate=0.1):
+        super(BinaryClassifier, self).__init__()
+        layers = []
+        prev_dim = input_dim
+
+        for hidden_dim in hidden_dims:
+            layers.extend([
+                nn.Linear(prev_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout_rate)
+            ])
+            prev_dim = hidden_dim
+
+        # 输出层：二分类，输出维度为1（使用Sigmoid激活）或2（使用Softmax）
+        # 这里选择输出维度为1，配合BCEWithLogitsLoss或BCELoss
+        layers.append(nn.Linear(prev_dim, 1))
+        layers.append(nn.Sigmoid())
+        # 如果选择输出维度为2，配合CrossEntropyLoss，则注释上一行，取消下一行注释
+        # layers.append(nn.Linear(prev_dim, 2))
+        # layers.append(nn.Sigmoid(dim=1))
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.model(x)
 
 
 def get_wsi_handle(wsi_path):
@@ -61,7 +93,7 @@ def save_feature_subprocess(path, feature):
     process.start()
 
 
-def light_compute_w_loader(file_path, wsi, model,
+def light_compute_w_loader(file_path, wsi, cls_model, model,
                            batch_size=8, verbose=0, print_every=20, pretrained=True,
                            custom_downsample=1, target_patch_size=-1, custom_transformer=None):
     """
@@ -79,10 +111,10 @@ def light_compute_w_loader(file_path, wsi, model,
     dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, pretrained=pretrained, custom_transforms=custom_transformer,
                                  custom_downsample=custom_downsample, target_patch_size=target_patch_size, fast_read=True)
     ext = os.path.splitext(wsi._filename)[1]
-    if ext in ['.kfb']:
+    if ext in ['.kfb', '.tmap', 'sdpc']:
         kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
         loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
-    elif ext in ['.svs', '.ndpi']:
+    elif ext in ['svs', 'tif', 'ndpi', 'tiff', 'mrxs']:
         kwargs = {'num_workers': 16, 'pin_memory': True} if device.type == "cuda" else {}
         loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=32)
     print('Data Loader args:', kwargs)
@@ -90,30 +122,22 @@ def light_compute_w_loader(file_path, wsi, model,
     if verbose > 0:
         print('processing {}: total of {} batches'.format(file_path, len(loader)))
 
-    features_list = []
-    coords_list = []
     _start_time = time.time()
-    cal_time = time.time()
-    for count, (batch, coords) in enumerate(loader):
-        read_time_flag = time.time()
-        img_read_time = abs(read_time_flag - cal_time)
-        # print('Reading images time:', img_read_time)
-        with torch.no_grad():
-            if count % print_every == 0:
+    count = 0
+    with torch.no_grad():
+        for count1, (batch, coords) in enumerate(loader):
+            if count1 % print_every == 0:
                 batch_time = time.time()
                 print('batch {}/{}, {} files processed, used_time: {} s'.format(
-                    count, len(loader), count * batch_size, batch_time - _start_time))
+                    count1, len(loader), count1 * batch_size, batch_time - _start_time))
             batch = batch.to(device, non_blocking=True)
             features = model(batch)
-            features = features.cpu()
-            features_list.append(features)
-            coords_list.append(coords)
-            cal_time = time.time()
-        # print('Calculation time: {} s'.format(cal_time-read_time_flag))
+            output = cls_model(features)
+            threshold_tensor = torch.tensor(0.5, device=output.device)
+            predicted = (output >= threshold_tensor).to(torch.int64).reshape(-1).cpu()
+            count += (predicted == 1).sum().item()
 
-    features = torch.cat(features_list, dim=0)
-    coords = np.concatenate(coords_list, axis=0)
-    return features, coords
+    return count
 
 
 def find_all_wsi_paths(wsi_root, extentions):
@@ -141,17 +165,14 @@ parser.add_argument('--data_slide_dir', type=str, default=None)
 parser.add_argument('--slide_ext', type=str, default='.svs')
 parser.add_argument('--csv_path', type=str, default=None)
 parser.add_argument('--feat_dir', type=str, default=None)
-parser.add_argument('--batch_size', type=int, default=256)
+parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--custom_downsample', type=int, default=1)
 parser.add_argument('--target_patch_size', type=int, default=-1)
-parser.add_argument('--model', type=str)
-parser.add_argument('--datatype', type=str)
+parser.add_argument('--model', type=str, help='patch分类模型参数')
+parser.add_argument('--ckpt', type=str)
 parser.add_argument('--save_storage', type=str, default='no')
 
 parser.add_argument('--ignore_partial', default='yes', type=str)
-
-# Histlogy-pretrained MAE setting
-# parser.add_argument('--mae_checkpoint', type=str, default=None, help='path to pretrained mae checkpoint')
 
 args = parser.parse_args()
 
@@ -167,6 +188,8 @@ if __name__ == '__main__':
     os.makedirs(args.feat_dir, exist_ok=True)
     os.makedirs(os.path.join(args.feat_dir, 'pt_files', args.model), exist_ok=True)
     os.makedirs(os.path.join(args.feat_dir, 'h5_files', args.model), exist_ok=True)
+    os.makedirs(os.path.join(args.feat_dir, 'masks'), exist_ok=True)
+    os.makedirs(os.path.join(args.feat_dir, 'slides'), exist_ok=True)
     dest_files = os.listdir(os.path.join(args.feat_dir, 'pt_files', args.model))
 
     print('loading model checkpoint:', args.model)
@@ -174,7 +197,11 @@ if __name__ == '__main__':
     print('Device:{}, GPU Count:{}'.format(device.type, torch.cuda.device_count()))
 
     model = get_model(args.model, device, torch.cuda.device_count())
-    custom_transformer = get_custom_transformer(args.model)
+    custom_transformer = transforms.Compose([TorchStain(), ] + get_custom_transformer(args.model).transforms)
+    print("初始化模型...")
+    cls_model = BinaryClassifier().to(device)
+    cls_model.load_state_dict(torch.load(args.ckpt, map_location=device))
+    cls_model.eval()
 
     total = len(bags_dataset)
     print('Total number of WSIs:', total)
@@ -200,6 +227,8 @@ if __name__ == '__main__':
 
     print('WSIs need to be processed: {} of {}'.format(len(exist_idxs), total))
 
+    patch_cnt_path = os.path.join(args.feat_dir, 'tumor_patch_cnt.csv')
+    data = []
     for index, bag_candidate_idx in enumerate(exist_idxs):
         slide_id = get_slide_id(bag_candidate_idx)
         bag_name = slide_id + '.h5'
@@ -230,21 +259,17 @@ if __name__ == '__main__':
         with open(output_feature_path + '.partial', 'w') as f:
             f.write("")
 
-        features, coords = light_compute_w_loader(h5_file_path, wsi,
-                                                  model=model, batch_size=args.batch_size, verbose=1, print_every=20,
-                                                  custom_downsample=args.custom_downsample, target_patch_size=args.target_patch_size,
-                                                  custom_transformer=custom_transformer)
-
-        # save results
-        save_feature_subprocess(output_feature_path, features)
-        print('feature shape:', features.shape)
-        print('coords shape:', coords.shape)
-        asset_dict = {'coords': coords}
-        save_hdf5_subprocess(output_h5_path, asset_dict=asset_dict)
-
-        # clear temp file
-        os.remove(output_feature_path + '.partial')
-        print('time per slide: {:.1f}'.format(time.time() - one_slide_start))
+        count = light_compute_w_loader(h5_file_path, wsi, cls_model,
+                                       model=model, batch_size=args.batch_size, verbose=1, print_every=20,
+                                       custom_downsample=args.custom_downsample, target_patch_size=args.target_patch_size,
+                                       custom_transformer=custom_transformer)
+        data.append({'slide_id': slide_id, 'count': count})
+        print(f'slide_id: {slide_id}, count: {count}')
+        df_new = pd.DataFrame([[slide_id, count]], columns=['slide_id', 'count'])
+        if os.path.exists(patch_cnt_path):
+            df_new.to_csv(patch_cnt_path, mode='a', header=False, index=False)
+        else:
+            df_new.to_csv(patch_cnt_path, index=False)
 
     print('Time used for this dataset:{:.1f}'.format(time.time() - process_start_time))
     print('Extracting end', end='')

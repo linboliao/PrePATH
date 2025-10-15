@@ -1,3 +1,8 @@
+import os
+
+os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
+os.environ['HF_HOME'] = '/NAS3/lbliao/Code/PrePATH/models/ckpts/huggingface-jing'
+
 import torch
 import timm
 import numpy as np
@@ -140,18 +145,18 @@ def get_model(model_name, device, gpu_num, jit=False):
     elif model_name.lower() == 'hibou-l':
         from models.hibou_l import get_model
         model = get_model(device, gpu_num)
-    
+
     elif model_name.lower() == 'omiclip':
         from models.omiclip import get_model
         model = get_model(device, __implemented_models['omiclip'])
-    
+
     elif model_name.lower() == 'patho_clip':
         from models.patho_clip import get_model_ViT_L
         model = get_model_ViT_L(device, __implemented_models['patho_clip'])
-    
+
     else:
         raise NotImplementedError(f'{model_name} is not implemented')
-    
+
     if model_name in ['resnet50', 'resnet101']:
         if gpu_num > 1:
             model = torch.nn.parallel.DataParallel(model)
@@ -180,12 +185,12 @@ def get_custom_transformer(model_name):
         # Use proper preprocessing for phikon2 to avoid CPU bottleneck
         from models.phikon2 import get_phikon2_trans
         custom_trans = get_phikon2_trans()
-        
+
     elif model_name == 'phikon':
         # Use proper preprocessing for phikon to avoid CPU bottleneck
         from models.phikon import get_phikon_trans
         custom_trans = get_phikon_trans()
-        
+
     elif model_name == 'hibou-l':
         # Use proper preprocessing for hibou-l to avoid CPU bottleneck
         from models.hibou_l import get_hibou_l_trans
@@ -263,15 +268,15 @@ def get_custom_transformer(model_name):
     elif model_name.lower() == 'lunit':
         from models.lunit import get_trans
         custom_trans = get_trans()
-    
+
     elif model_name.lower() == 'omiclip':
         from models.omiclip import get_trans
         custom_trans = get_trans(__implemented_models['omiclip'])
-    
+
     elif model_name.lower() == 'patho_clip':
         from models.patho_clip import get_trans_ViT_L
         custom_trans = get_trans_ViT_L(__implemented_models['patho_clip'])
-        
+
     else:
         raise NotImplementedError('Transformers for {} is not implemented ...'.format(model_name))
 

@@ -110,9 +110,14 @@ def light_compute_w_loader(file_path, wsi, cls_model, model,
     dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, pretrained=pretrained, custom_transforms=custom_transformer,
                                  custom_downsample=custom_downsample, target_patch_size=target_patch_size, fast_read=True)
     # 当数据加载时出出现图片损坏时，将 num_workers 设置为 0
-    kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
+    ext = os.path.splitext(wsi._filename)[1]
+    if ext in ['.kfb']:
+        kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
+        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
+    elif ext in ['.svs', '.ndpi']:
+        kwargs = {'num_workers': 16, 'pin_memory': True} if device.type == "cuda" else {}
+        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=32)
     print('Data Loader args:', kwargs)
-    loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
 
     if verbose > 0:
         print('processing {}: total of {} batches'.format(file_path, len(loader)))
@@ -209,11 +214,7 @@ if __name__ == '__main__':
     print('Device:{}, GPU Count:{}'.format(device.type, torch.cuda.device_count()))
 
     model = get_model(args.model, device, torch.cuda.device_count())
-    custom_transformer = transforms.Compose([
-        TorchStain(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-    ])
+    custom_transformer = transforms.Compose([TorchStain()] + get_custom_transformer(args.model).transforms)
 
     print("初始化模型...")
     cls_model = BinaryClassifier().to(device)
