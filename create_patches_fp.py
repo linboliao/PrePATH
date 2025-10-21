@@ -1,4 +1,5 @@
 # internal imports
+import glob
 import traceback
 
 from wsi_core.WholeSlideImage import WholeSlideImage
@@ -308,14 +309,14 @@ def mp_seg_and_patch(
 
     slides = []
     # multi format support
-    if ";" in wsi_format:
-        wsi_format = wsi_format.split(";")
-    for root, dirs, filenames in os.walk(source):
-        for filename in filenames:
-            postfix = filename.split(".")[-1].lower()
-            if postfix in wsi_format:
-                slides.append(os.path.join(root, filename))
-
+    link_path = os.path.join(source, 'symlink_record.csv')
+    if os.path.exists(link_path):
+        df = pd.read_csv(link_path)
+        all_paths = df['target'].to_list()
+    else:
+        all_paths = glob.glob(os.path.join(source, '**'), recursive=True)
+    for ext in wsi_format.split(';'):
+        slides += [i for i in all_paths if i.split('.')[-1].lower() == ext.lower()]
     if process_list is None:
         df = initialize_df(slides, seg_params, filter_params, vis_params, patch_params)
     else:

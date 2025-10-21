@@ -1,5 +1,7 @@
 import os
 
+import pandas as pd
+
 os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
 os.environ['HF_HOME'] = '/NAS2/Data1/lbliao/Code/PrePATH/models/ckpts/huggingface-195'
 
@@ -78,11 +80,12 @@ def light_compute_w_loader(file_path, wsi, model,
     """
     dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, pretrained=pretrained, custom_transforms=custom_transformer,
                                  custom_downsample=custom_downsample, target_patch_size=target_patch_size, fast_read=True)
-    if wsi._filename.endswith('.kfb'):
+    from wsi_core.Aslide.aslide import Slide
+    if type(wsi) is Slide:
         kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
         loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
-    elif wsi._filename.endswith('.svs'):
-        kwargs = {'num_workers': 16, 'pin_memory': True} if device.type == "cuda" else {}
+    elif type(wsi) is openslide.OpenSlide:
+        kwargs = {'num_workers': 4, 'pin_memory': True} if device.type == "cuda" else {}
         loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=32)
     print('Data Loader args:', kwargs)
 
@@ -121,17 +124,24 @@ def find_all_wsi_paths(wsi_root, extentions):
     """
     # to support more than one ext, e.g., support .svs and .mrxs
     result = {}
+    link_path = os.path.join(wsi_root, 'symlink_record.csv')
+    if os.path.exists(link_path):
+        df = pd.read_csv(link_path)
+        all_paths = df['target'].to_list()
+    else:
+        all_paths = glob.glob(os.path.join(wsi_root, '**'), recursive=True)
+
     for ext in extentions.split(';'):
         print('Process format:', ext)
         ext = ext[1:]
-        all_paths = glob.glob(os.path.join(wsi_root, '**'), recursive=True)
-        all_paths = [i for i in all_paths if i.split('.')[-1].lower() == ext.lower()]
-        for h in all_paths:
+        paths = [i for i in all_paths if i.split('.')[-1].lower() == ext.lower()]
+        for h in paths:
             slide_name = os.path.split(h)[1]
             slide_id = '.'.join(slide_name.split('.')[0:-1])
             result[slide_id] = h
     print("found {} wsi".format(len(result)))
     return result
+
 
 
 parser = argparse.ArgumentParser(description='Feature Extraction')
