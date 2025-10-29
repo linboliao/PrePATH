@@ -115,8 +115,8 @@ def light_compute_w_loader(file_path, wsi, cls_model, model,
         kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
         loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
     elif ext in ['svs', 'tif', 'ndpi', 'tiff', 'mrxs']:
-        kwargs = {'num_workers': 16, 'pin_memory': True} if device.type == "cuda" else {}
-        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=32)
+        kwargs = {'num_workers': 4, 'pin_memory': True} if device.type == "cuda" else {}
+        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=8)
     print('Data Loader args:', kwargs)
 
     if verbose > 0:
