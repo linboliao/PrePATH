@@ -86,7 +86,7 @@ def light_compute_w_loader(file_path, wsi, model,
         loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
     elif type(wsi) is openslide.OpenSlide:
         kwargs = {'num_workers': 4, 'pin_memory': True} if device.type == "cuda" else {}
-        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=32)
+        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=8)
     print('Data Loader args:', kwargs)
 
     if verbose > 0:
