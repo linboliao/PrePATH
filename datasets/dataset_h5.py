@@ -120,9 +120,8 @@ class Whole_Slide_Bag_FP(Dataset):
 
         with h5py.File(self.file_path, "r") as f:
             dset = f['coords']
-            # self.patch_level = f['coords'].attrs['patch_level']
-            self.patch_level = 0
-            self.patch_size = 512
+            self.patch_level = f['coords'].attrs['patch_level']
+            self.patch_size = f['coords'].attrs['patch_size']
             self.length = len(dset)
             if target_patch_size > 0:
                 self.target_patch_size = (target_patch_size, ) * 2

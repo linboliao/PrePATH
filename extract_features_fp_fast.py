@@ -78,13 +78,13 @@ def light_compute_w_loader(file_path, wsi, model,
     """
     dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, pretrained=pretrained, custom_transforms=custom_transformer,
                                  custom_downsample=custom_downsample, target_patch_size=target_patch_size, fast_read=True)
-    ext = os.path.splitext(wsi._filename)[1]
-    if ext in ['.kfb']:
+    from wsi_core.Aslide.aslide import Slide
+    if type(wsi) is Slide:
         kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
         loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
-    elif ext in ['.svs', '.ndpi']:
-        kwargs = {'num_workers': 16, 'pin_memory': True} if device.type == "cuda" else {}
-        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=32)
+    elif type(wsi) is openslide.OpenSlide:
+        kwargs = {'num_workers': 4, 'pin_memory': True} if device.type == "cuda" else {}
+        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=8)
     print('Data Loader args:', kwargs)
 
     if verbose > 0:

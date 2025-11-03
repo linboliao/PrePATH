@@ -115,8 +115,8 @@ def light_compute_w_loader(file_path, wsi, cls_model, model,
         kwargs = {'num_workers': 1, 'pin_memory': True} if device.type == "cuda" else {}
         loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=2)
     elif ext in ['.svs', '.ndpi']:
-        kwargs = {'num_workers': 16, 'pin_memory': True} if device.type == "cuda" else {}
-        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=32)
+        kwargs = {'num_workers': 4, 'pin_memory': True} if device.type == "cuda" else {}
+        loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features, prefetch_factor=8)
     print('Data Loader args:', kwargs)
 
     if verbose > 0:
@@ -182,8 +182,9 @@ parser.add_argument('--feat_dir', type=str, default=None)
 parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--custom_downsample', type=int, default=1)
 parser.add_argument('--target_patch_size', type=int, default=-1)
-parser.add_argument('--model', type=str, help='patch分类模型参数')
-parser.add_argument('--ckpt', type=str)
+parser.add_argument('--model', type=str,)
+parser.add_argument('--ckpt', type=str, help='patch分类模型参数')
+parser.add_argument('--input_dim', type=int, help='patch分类模型参数')
 parser.add_argument('--save_storage', type=str, default='no')
 
 parser.add_argument('--ignore_partial', default='yes', type=str)
@@ -217,7 +218,7 @@ if __name__ == '__main__':
     custom_transformer = transforms.Compose([TorchStain()] + get_custom_transformer(args.model).transforms)
 
     print("初始化模型...")
-    cls_model = BinaryClassifier().to(device)
+    cls_model = BinaryClassifier(args.input_dim).to(device)
     cls_model.load_state_dict(torch.load(args.ckpt, map_location=device))
     cls_model.eval()
 
