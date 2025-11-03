@@ -1,12 +1,7 @@
-# The coordinates of the patches are saved, you can change the path to any directory you want.
-save_dir="/NAS3/lbliao/Data/CRC/分子检测"
-# The directory where the WSI files are stored, you can change it to any directory you want.
-wsi_dir="/NAS2/lbliao/CRC分子检测"
-# The WSI format, you can set it based on the format of your WSI
-wsi_format="ndpi"
-# The log file name, you can change it to any name you want.
-log_name="SAL.log"
 
-# Normally, you don't need to change following lines.
-# to set the patch size, please set it at `configs/resolution.py`
-python create_patches_fp.py --source $wsi_dir --save_dir $save_dir --patch_size 448 --preset xiehe.csv --patch_level 0 --wsi_format $wsi_format --seg --patch --stitch --use_mp
+save_dir=/NAS3/lbliao/Data/CRC/分子检测
+wsi_dir=/NAS2/lbliao/CRC分子检测
+wsi_format="ndpi"
+patch_size=448
+
+python create_patches_fp.py --source $wsi_dir --save_dir $save_dir --patch_size $patch_size --step_size $patch_size --preset xiehe.csv --patch_level 0 --wsi_format $wsi_format --seg --patch --stitch --use_mp
