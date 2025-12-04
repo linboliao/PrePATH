@@ -153,6 +153,10 @@ def get_model(model_name, device, gpu_num, jit=False):
     elif model_name.lower() == 'patho_clip':
         from models.patho_clip import get_model_ViT_L
         model = get_model_ViT_L(device, __implemented_models['patho_clip'])
+
+    elif model_name.lower() == 'dinov3':
+        from models.dinov3 import get_dinov3_model
+        model = get_dinov3_model(device)
     
     else:
         raise NotImplementedError(f'{model_name} is not implemented')
@@ -268,7 +272,11 @@ def get_custom_transformer(model_name):
     elif model_name.lower() == 'lunit':
         from models.lunit import get_trans
         custom_trans = get_trans()
-    
+
+    elif model_name.lower() == 'dinov3':
+        from models.dinov3 import get_dinov3_trans
+        custom_trans = get_dinov3_trans()
+
     elif model_name.lower() == 'omiclip':
         from models.omiclip import get_trans
         custom_trans = get_trans(__implemented_models['omiclip'])
