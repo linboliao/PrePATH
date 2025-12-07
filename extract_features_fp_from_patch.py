@@ -15,7 +15,7 @@ import pandas as pd
 class Dataset_All_Bags(Dataset):
 
 	def __init__(self, csv_path):
-		self.df = pd.read_csv(csv_path, dtype={'case_id': str, 'slide_id': str})
+		self.df = pd.read_csv(csv_path, dtype={'dir': str, 'slide_id': str})
 	
 	def __len__(self):
 		return len(self.df)
@@ -28,7 +28,18 @@ class PatchDataset(Dataset):
     def __init__(self, img_root, patch_h5_path, transform=None) -> None:
         super().__init__()
         self.img_root = img_root
-        self.coords = h5py.File(patch_h5_path)['coords']
+        coords = h5py.File(patch_h5_path)['coords']
+        self.coords = []
+        self.paths = []
+        for i, coord in enumerate(coords):
+            x, y = coord[0], coord[1]  # 根据实际数据结构调整索引
+            img_name = f'{x}_{y}_448_448.jpg'
+            img_path = os.path.join(img_root, img_name)
+
+            # 检查路径是否存在[9,10](@ref)
+            if os.path.exists(img_path):
+                self.coords.append(coord)
+                self.paths.append(img_path)
         actual_files = os.listdir(img_root)
         self.transform = transform
         assert len(actual_files) + 1 >= len(self.coords), 'real patch {} not match h5 patch number {}'.format(len(actual_files), len(self.coords))
@@ -37,10 +48,10 @@ class PatchDataset(Dataset):
         return len(self.coords)
     
     def __getitem__(self, index):
-        x, y = self.coords[index]
-        img_name = '{}_{}_512_512.jpg'.format(x, y)
-        p = os.path.join(self.img_root, img_name)
-        img = Image.open(p)
+        # x, y = self.coords[index]
+        # img_name = '{}_{}_448_448.jpg'.format(x, y)
+        # p = os.path.join(self.img_root, img_name)
+        img = Image.open(self.paths[index]).convert('RGB')
         if self.transform is not None:
             img = self.transform(img)
 
@@ -140,6 +151,8 @@ if __name__ == '__main__':
         
         output_feature_path = os.path.join(args.feat_dir, 'pt_files', args.model, slide_id+'.pt')
         images_path = os.path.join(patch_img_dir, slide_id)
+        if not os.path.exists(images_path):
+            continue
         h5_file_path = os.path.join(args.data_h5_dir, 'patches', slide_id+'.h5')
         
         # skip if '.partial' file exists
