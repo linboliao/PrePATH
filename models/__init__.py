@@ -1,7 +1,8 @@
 import os
 
 os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
-os.environ['HF_HOME'] = '/NAS2/Data1/lbliao/Code/PrePATH/models/ckpts/huggingface-195'
+# os.environ['HF_HOME'] = '/NAS2/Data1/lbliao/Code/PrePATH/models/ckpts/huggingface-195'
+os.environ['HF_HOME'] = '/NAS3/lbliao/Code/PrePATH/models/ckpts/huggingface-jing'
 
 import torch
 import timm

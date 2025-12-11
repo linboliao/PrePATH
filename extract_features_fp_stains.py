@@ -1,12 +1,7 @@
-import os
-
 import pandas as pd
 from torchvision import transforms
 
 from utils.stains import TorchStain
-
-os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
-os.environ['HF_HOME'] = '/NAS2/Data1/lbliao/Code/PrePATH/models/ckpts/huggingface-195'
 
 import torch
 import os

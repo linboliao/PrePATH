@@ -1,9 +1,4 @@
-import os
-
 import pandas as pd
-
-os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
-os.environ['HF_HOME'] = '/NAS2/Data1/lbliao/Code/PrePATH/models/ckpts/huggingface-195'
 
 import torch
 import os
@@ -141,7 +136,6 @@ def find_all_wsi_paths(wsi_root, extentions):
             result[slide_id] = h
     print("found {} wsi".format(len(result)))
     return result
-
 
 
 parser = argparse.ArgumentParser(description='Feature Extraction')
