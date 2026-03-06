@@ -9,6 +9,7 @@ from wsi_core.WholeSlideImage import WholeSlideImage
 from configs import resolution as RESOLUTION
 import openslide
 
+
 def adjust_size(object_power):
     steps = RESOLUTION.STEPS
     sizes = RESOLUTION.SIZES
@@ -19,6 +20,7 @@ def adjust_size(object_power):
     else:
         return sizes["80x"], steps["80x"]
 
+
 def get_wsi_handle(wsi_path):
     if not os.path.exists(wsi_path):
         raise FileNotFoundError(f'{wsi_path} is not found')
@@ -27,7 +29,7 @@ def get_wsi_handle(wsi_path):
         handle = openslide.OpenSlide(wsi_path)
     elif postfix.lower() in ['jpg', 'jpeg', 'tiff', 'png']:
         handle = ImgReader(wsi_path)
-    
+
     elif postfix.lower() in ['kfb', 'tmap', 'sdpc']:
         from wsi_core.Aslide.aslide import Slide
         handle = Slide(wsi_path)
@@ -36,12 +38,11 @@ def get_wsi_handle(wsi_path):
     return handle
 
 
-
 def read_images(arg):
     h5_path, save_root, wsi_path, auto_size, level, size = arg
     if wsi_path is None:
         return
-    
+
     if not os.path.exists(save_root):
         os.makedirs(save_root)
 
@@ -52,16 +53,16 @@ def read_images(arg):
         print(f'{h5_path} is not readable....')
         return
         # raise RuntimeError(f'{h5_path} is not readable....')
-    
+
     _num = len(h5['coords'])
     if _num == len(os.listdir(save_root)):
         return
-    
+
     coors = h5['coords']
-    
+
     # Get the WSI handle
     wsi_handle = get_wsi_handle(wsi_path)
-    
+
     # If auto_size is enabled, determine the appropriate size and level based on the WSI's object power
     if auto_size:
         try:
@@ -78,7 +79,7 @@ def read_images(arg):
                 size = (size, size)
     elif not isinstance(size, tuple):
         size = (size, size)
-    
+
     for x, y in coors:
         p = os.path.join(save_root, '{}_{}_{}_{}.jpg'.format(x, y, size[0], size[1]))
         if os.path.exists(p):
@@ -107,9 +108,9 @@ def get_wsi_path(wsi_root, h5_files, datatype, wsi_format):
                 kv[k] = os.path.join(wsi_root, meta[0])
     elif datatype.lower() == 'single_folder':
         _files = os.listdir(wsi_root)
-        _files = [f for f in _files if f.split('.')[-1]==wsi_format]
+        _files = [f for f in _files if f.split('.')[-1] == wsi_format]
         for l in _files:
-            svs_id = l[:-len(wsi_format)-1]
+            svs_id = l[:-len(wsi_format) - 1]
             kv[svs_id] = wsi_root
     elif datatype.lower() == 'auto':
         # auto search path
@@ -141,11 +142,30 @@ def get_wsi_path(wsi_root, h5_files, datatype, wsi_format):
         if r is None:
             p = None
         else:
-            p = os.path.join(r, prefix+'.'+wsi_format)
+            p = os.path.join(r, prefix + '.' + wsi_format)
 
         wsi_paths.append(p)
-    
+
     return wsi_paths
+
+
+def find_all_wsi_paths(wsi_root, extentions):
+    """
+    find the full wsi path under data_root, return a dict {slide_id: full_path}
+    """
+    # to support more than one ext, e.g., support .svs and .mrxs
+    result = {}
+    for ext in extentions.split(';'):
+        print('Process format:', ext)
+        ext = ext[1:]
+        all_paths = glob.glob(os.path.join(wsi_root, '**'), recursive=True)
+        all_paths = [i for i in all_paths if i.split('.')[-1].lower() == ext.lower()]
+        for h in all_paths:
+            slide_name = os.path.split(h)[1]
+            slide_id = '.'.join(slide_name.split('.')[0:-1])
+            result[slide_id] = h
+    print("found {} wsi".format(len(result)))
+    return result
 
 
 def argparser():
@@ -170,7 +190,7 @@ if __name__ == '__main__':
     auto_size = parser.auto_size
     level = parser.level
     size = parser.size
-        
+
     h5_root = parser.h5_root
     save_root = parser.save_root
     wsi_root = parser.wsi_root
@@ -178,13 +198,12 @@ if __name__ == '__main__':
     h5_files = os.listdir(h5_root)
     h5_paths = [os.path.join(h5_root, p) for p in h5_files]
     wsi_paths = get_wsi_path(wsi_root, h5_files, datatype, wsi_format)
+    # wsi_paths = find_all_wsi_paths(wsi_root, extentions=wsi_format).values()
     save_roots = [os.path.join(save_root, i[:-3]) for i in h5_files]
-    
+
     # Include auto_size flag in the arguments
     args = [(h5, sr, wsi_path, auto_size, level, size) for h5, wsi_path, sr in zip(h5_paths, wsi_paths, save_roots)]
 
     mp = Pool(parser.cpu_cores)
     mp.map(read_images, args)
     print('All slides have been cropped!')
-
-

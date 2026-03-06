@@ -1,7 +1,7 @@
 import os
 
 os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
-os.environ['HF_HOME'] = '/NAS2/Data1/lbliao/Code/PrePATH/models/ckpts/huggingface'
+os.environ['HF_HOME'] = '/NAS3/lbliao/Code/PrePATH/models/ckpts/huggingface-jing'
 
 import torch
 import os
@@ -206,7 +206,10 @@ if __name__ == '__main__':
         h5_file_path = os.path.join(args.data_coors_dir, 'patches', bag_name)
 
         # TCGA
-        slide_file_path = all_wsi_paths[slide_id]
+        # slide_file_path = all_wsi_paths[slide_id]
+        slide_file_path = (all_wsi_paths.get(slide_id) or
+                           all_wsi_paths.get(slide_id.replace('-', '_')) or
+                           all_wsi_paths.get(slide_id.replace('-', ' ')))
         print('Time:', datetime.now().strftime('"%Y-%m-%d, %H:%M:%S"'))
         print('\nprogress: {}/{}, slide_id: {}'.format(index, len(exist_idxs), slide_id))
 
