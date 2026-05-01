@@ -8,7 +8,7 @@ import torchstain
 from PIL import Image
 from matplotlib import pyplot as plt
 from torchvision.transforms import transforms
-from wsi_normalizer import TorchVahadaneNormalizer, imread
+from utils.vahadane import TorchVahadaneNormalizer
 
 script_dir = Path(__file__).resolve().parent
 REF_IMG_PATH = str(script_dir / "TUM-AEKDYIAK.tif")
@@ -93,7 +93,7 @@ class WSINormalizer:
 
 
 class TorchStain:
-    def __init__(self):
+    def __init__(self, method='macenko'):
         print("初始化染色归一化参考图像...")
         try:
             target = cv2.cvtColor(cv2.imread(REF_IMG_PATH), cv2.COLOR_BGR2RGB)
@@ -102,7 +102,12 @@ class TorchStain:
                 transforms.Lambda(lambda x: x * 255.0)
             ])
             target_tensor = self.tensor_transform(target).float()
-            normalizer = torchstain.normalizers.MacenkoNormalizer(backend='torch')
+            if method.lower() == 'macenko':
+                normalizer = torchstain.normalizers.MacenkoNormalizer(backend='torch')
+            elif method.lower() == 'reinhard':
+                normalizer = torchstain.normalizers.ReinhardNormalizer(backend='torch')
+            elif method.lower() == 'vahadane':
+                normalizer = TorchVahadaneNormalizer(device=torch.device('cuda:0'))
             normalizer.fit(target_tensor)
             self.normalizer = normalizer
             print("染色归一化参考图像已加载")

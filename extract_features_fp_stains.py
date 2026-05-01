@@ -1,7 +1,7 @@
 import pandas as pd
 from torchvision import transforms
 
-from utils.stains import TorchStain
+from utils.stains import TorchStain, WSINormalizer
 
 import torch
 import os
@@ -204,7 +204,7 @@ if __name__ == '__main__':
     print('WSIs need to be processed: {} of {}'.format(len(exist_idxs), total))
     if exist_idxs:
         model = get_model(args.model, device, torch.cuda.device_count())
-        custom_transformer = transforms.Compose([TorchStain()] + get_custom_transformer(args.model).transforms)
+        custom_transformer = transforms.Compose([TorchStain('vahadane')] + get_custom_transformer(args.model).transforms)
     for index, bag_candidate_idx in enumerate(exist_idxs):
         slide_id = get_slide_id(bag_candidate_idx)
         bag_name = slide_id + '.h5'

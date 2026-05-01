@@ -1,7 +1,7 @@
 import os
 
 os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
-os.environ['HF_HOME'] = '/NAS3/lbliao/Code/PrePATH/models/ckpts/huggingface-jing'
+os.environ['HF_HOME'] = './models/ckpts/huggingface'
 
 import torch
 import timm
@@ -83,19 +83,19 @@ def get_model(model_name, device, gpu_num, jit=False):
         from models.mSTAR import get_mSTAR_model
         model = get_mSTAR_model(device, __implemented_models[model_name.lower()], jit=jit)
 
-    elif model_name == 'phikon':
+    elif model_name.lower() == 'phikon':
         from models.phikon import get_phikon
         model = get_phikon(device, gpu_num)
 
-    elif model_name == 'phikon2':
+    elif model_name.lower() == 'phikon2':
         from models.phikon2 import get_model
         model = get_model(device)
 
-    elif model_name == 'virchow':
+    elif model_name.lower() == 'virchow':
         from models.virchow import get_virchow_model
         model = get_virchow_model(device)
 
-    elif model_name == 'virchow2':
+    elif model_name.lower() == 'virchow2':
         from models.virchow2 import get_virchow_model
         model = get_virchow_model(device)
 
@@ -220,11 +220,11 @@ def get_custom_transformer(model_name):
         from models.mSTAR import get_mSTAR_trans
         custom_trans = get_mSTAR_trans()
 
-    elif model_name == 'virchow':
+    elif model_name.lower() == 'virchow':
         from models.virchow import get_virchow_trans
         custom_trans = get_virchow_trans()
 
-    elif model_name == 'virchow2':
+    elif model_name.lower() == 'virchow2':
         from models.virchow2 import get_virchow_trans
         custom_trans = get_virchow_trans()
 

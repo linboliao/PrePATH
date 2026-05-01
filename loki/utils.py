@@ -29,7 +29,7 @@ def load_model(
     Load pretrained OmiCLIP (COCA ViT‑L‑14) model, its image preprocess, and tokenizer.
     """
     model, preprocess = create_model_from_pretrained(
-        "coca_ViT-L-14", device=device, pretrained=model_path
+        "coca_ViT-L-14", device=device, pretrained=model_path, weights_only=False
     )
     tokenizer = get_tokenizer("coca_ViT-L-14")
     model.to(device).eval()

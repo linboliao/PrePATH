@@ -64,7 +64,7 @@ class SimpleViT(nn.Module):
 # ===============   加载本地 DINOv3 权重模型函数   ===============
 # ==============================================================
 
-def get_dinov3_model(device, weights_path='/NAS3/hukang/Code/dinov3_train/outputs/industrial_ssl/checkpoint_epoch_11.pth'):
+def get_dinov3_model(device, weights_path='/NAS2/Data1/hukang/Code/dinov3_train/outputs/industrial_ssl/checkpoint_epoch_11.pth'):
     print(f"✅ 使用本地 DINOv3 权重加载 (兼容 torchvision==0.11.2, 输入256x256)")
     model = SimpleViT(embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, img_size=256)
     model.to(device)
