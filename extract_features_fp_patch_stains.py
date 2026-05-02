@@ -1,10 +1,6 @@
 import os
 import concurrent.futures
-import traceback
-from datetime import datetime
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
-
 from models import get_model, get_custom_transformer
 import argparse
 from multiprocessing import Process
@@ -14,19 +10,13 @@ from tqdm import tqdm
 import multiprocessing as mp
 import time
 
-from utils.stains import TorchStain
-
 
 class ImageDataset(Dataset):
     def __init__(self, image_list, transform=None, preload=True, num_workers=None):
-        """
-        image_list: 包含 (img_path, save_feat_path) 的列表
-        """
         self.image_list = image_list
         self.transform = transform
         self.preload = preload
         self.num_workers = num_workers if num_workers is not None else mp.cpu_count()
-
         self.preloaded_data = []
         if self.preload:
             self._parallel_preload()
@@ -54,48 +44,56 @@ class ImageDataset(Dataset):
             image, feat_path = self.preloaded_data[idx]
         else:
             image, feat_path = self._load_single_image(idx)
-
         if self.transform:
             image = self.transform(image)
         return image, feat_path
 
 
 def save_feature(paths, features):
-    s = time.time()
+    """保存单个 batch 的特征"""
     for feature, path in zip(features, paths):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        parent_dir = os.path.dirname(path)
+        if not os.path.exists(parent_dir):
+            os.makedirs(parent_dir, exist_ok=True)
         torch.save(feature.clone().cpu(), path)
-    e = time.time()
-    print('Feature is successfully saved, cost: {:.1f} s'.format(e - s))
 
 
 def save_feature_subprocess(features, paths):
-    kwargs = {'features': features, 'paths': paths}
-    process = Process(target=save_feature, kwargs=kwargs)
+    """启动子进程保存当前 batch"""
+    process = Process(target=save_feature, args=(paths, features))
     process.start()
     return process
 
 
 def light_compute_w_loader(loader, model, device, print_every=20):
-    features_list = []
-    paths_list = []
     _start_time = time.time()
-
     model.eval()
-    for count, (batch, path) in enumerate(loader):
+
+    active_procs = []
+
+    for count, (batch, paths) in enumerate(loader):
         with torch.no_grad():
-            if count % print_every == 0:
-                print('batch {}/{}, {} files processed, used_time: {:.1f} s'.format(
-                    count, len(loader), count * len(batch), time.time() - _start_time))
-
             batch = batch.to(device, non_blocking=True)
-            features = model(batch).cpu()
-            features_list.append(features)
-            paths_list.append(path)
+            features = model(batch).cpu()  # 立即移至 CPU 释放显存
 
-    features = torch.cat(features_list, dim=0)
-    paths = [item for sublist in paths_list for item in sublist]
-    return features, paths
+            p = save_feature_subprocess(features, paths)
+            active_procs.append(p)
+
+            if len(active_procs) > 10:
+                active_procs = [p for p in active_procs if p.is_alive() or p.join(timeout=0)]
+
+            if count % print_every == 0:
+                print('batch {}/{}, used_time: {:.1f} s'.format(
+                    count, len(loader), time.time() - _start_time))
+
+    for p in active_procs:
+        p.join()
+
+
+def collate_features(batch):
+    img = torch.stack([item[0] for item in batch], dim=0)
+    path = [item[1] for item in batch]
+    return [img, path]
 
 
 parser = argparse.ArgumentParser(description='Feature Extraction')
@@ -115,53 +113,37 @@ if __name__ == '__main__':
     for cls in classes:
         cls_dir = os.path.join(args.patch_img_dir, cls)
         imgs = sorted([f for f in os.listdir(cls_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))])
-
         torch.manual_seed(42)
         indices = torch.randperm(len(imgs)).tolist()
-
         n = len(imgs)
-        t_sep = int(n * 0.7)
-        v_sep = int(n * 0.85)
+        t_sep, v_sep = int(n * 0.7), int(n * 0.85)
 
         for i, idx in enumerate(indices):
             img_name = imgs[idx]
             base = os.path.splitext(img_name)[0]
-            src = os.path.join(cls_dir, img_name)
-
             if i < t_sep:
                 mode = 'train'
             elif i < v_sep:
                 mode = 'val'
             else:
                 mode = 'test'
-
             dst = os.path.join(args.feat_dir, mode, cls, f"{base}.pt")
-            splits[mode].append((src, dst))
+            splits[mode].append((os.path.join(cls_dir, img_name), dst))
 
     model = get_model(args.model, device, torch.cuda.device_count())
-    custom_transformer = transforms.Compose([TorchStain('macenko')] + get_custom_transformer(args.model).transforms)
+    custom_transformer = get_custom_transformer(args.model)
 
-
-    def collate_features(batch):
-        img = torch.stack([item[0] for item in batch], dim=0)
-        path = [item[1] for item in batch]
-        return [img, path]
-
-
-    save_procs = []
     for mode in ['train', 'val', 'test']:
         if not splits[mode]: continue
+        print(f"\n>>> 正在处理: {mode.upper()} ({len(splits[mode])} samples)")
 
-        print(f"\n--- 开始处理 {mode} 集合 (样本数: {len(splits[mode])}) ---")
+        for cls in classes:
+            os.makedirs(os.path.join(args.feat_dir, mode, cls), exist_ok=True)
+
         dataset = ImageDataset(splits[mode], transform=custom_transformer, preload=True)
-        dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True, collate_fn=collate_features)
+        dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=4,
+                                pin_memory=True, collate_fn=collate_features)
 
-        features, paths = light_compute_w_loader(dataloader, model, device)
+        light_compute_w_loader(dataloader, model, device)
 
-        p = save_feature_subprocess(features, paths)
-        save_procs.append(p)
-
-    for p in save_procs:
-        p.join()
-
-    print(f'\n所有数据集提取完毕，总耗时: {time.time() - process_start_time:.1f}s')
+    print(f'\n[完成] 总耗时: {time.time() - process_start_time:.1f}s')
