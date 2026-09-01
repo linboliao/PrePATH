@@ -24,7 +24,7 @@ def get_virchow_trans():
 
 
 def get_virchow_model(device):
-    model = timm.create_model("hf-hub:paige-ai/Virchow2", pretrained=False,
+    model = timm.create_model("hf-hub:paige-ai/Virchow2", pretrained=True,
                               mlp_layer=SwiGLUPacked, act_layer=torch.nn.SiLU).to(device)
     model.eval()
 
