@@ -153,6 +153,11 @@ parser.add_argument('--target_patch_size', type=int, default=-1)
 parser.add_argument('--model', type=str)
 parser.add_argument('--datatype', type=str)
 parser.add_argument('--save_storage', type=str, default='no')
+parser.add_argument('--stain_method', type=str, default='macenko',
+                    choices=['macenko', 'reinhard', 'vahadane'])
+parser.add_argument('--stain_ref', type=str, default=None,
+                    help='reference image for stain normalisation fit; '
+                         'default = utils/TUM-AEKDYIAK.tif or $STAIN_REF_IMG')
 
 parser.add_argument('--ignore_partial', default='yes', type=str)
 
@@ -204,7 +209,7 @@ if __name__ == '__main__':
     print('WSIs need to be processed: {} of {}'.format(len(exist_idxs), total))
     if exist_idxs:
         model = get_model(args.model, device, torch.cuda.device_count())
-        custom_transformer = transforms.Compose([TorchStain('vahadane')] + get_custom_transformer(args.model).transforms)
+        custom_transformer = transforms.Compose([TorchStain(args.stain_method, args.stain_ref)] + get_custom_transformer(args.model).transforms)
     for index, bag_candidate_idx in enumerate(exist_idxs):
         slide_id = get_slide_id(bag_candidate_idx)
         bag_name = slide_id + '.h5'

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import cv2
@@ -11,7 +12,7 @@ from torchvision.transforms import transforms
 from utils.vahadane import TorchVahadaneNormalizer
 
 script_dir = Path(__file__).resolve().parent
-REF_IMG_PATH = str(script_dir / "TUM-AEKDYIAK.tif")
+REF_IMG_PATH = os.environ.get("STAIN_REF_IMG") or str(script_dir / "TUM-AEKDYIAK.tif")
 
 
 def visualize(org_img, stain_img):
@@ -93,10 +94,11 @@ class WSINormalizer:
 
 
 class TorchStain:
-    def __init__(self, method='macenko'):
-        print("初始化染色归一化参考图像...")
+    def __init__(self, method='macenko', ref_path=None):
+        ref = ref_path or REF_IMG_PATH
+        print(f"初始化染色归一化参考图像... method={method} ref={ref}")
         try:
-            target = cv2.cvtColor(cv2.imread(REF_IMG_PATH), cv2.COLOR_BGR2RGB)
+            target = cv2.cvtColor(cv2.imread(ref), cv2.COLOR_BGR2RGB)
             self.tensor_transform = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Lambda(lambda x: x * 255.0)

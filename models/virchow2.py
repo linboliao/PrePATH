@@ -11,9 +11,12 @@ from huggingface_hub import login
 
 script_dir = Path(__file__).resolve().parent
 token_path = str(script_dir / "token")
-with open(token_path, 'r') as f:
-    token = f.read().strip()
-login(token=token)
+try:
+    with open(token_path, 'r') as f:
+        token = f.read().strip()
+    login(token=token)
+except Exception as _e:
+    print(f'[virchow2] hf login skipped: {_e}')
 
 
 def get_virchow_trans():

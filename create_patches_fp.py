@@ -13,15 +13,23 @@ import argparse
 import pandas as pd
 
 
-def adjust_size(object_power):
-    steps = RESOLUTION.STEPS
-    sizes = RESOLUTION.SIZES
-    if object_power <= 30:
-        return sizes["20x"], steps["20x"]
-    elif 30 < object_power <= 60:
-        return sizes["40x"], steps["40x"]
-    else:
-        return sizes["80x"], steps["80x"]
+def adjust_size(slide_mpp, base_patch_size, base_step_size):
+    """MPP-calibrate patch/step so every slide is sampled at
+    RESOLUTION.TARGET_MPP microns/pixel regardless of scanner magnification.
+    base_* are the sizes defined at TARGET_MPP; read_region then grabs
+    base * TARGET_MPP/slide_mpp px, which the feature extractor's Resize
+    brings back to base px -> one constant physical scale for the encoder.
+    Falls back to base sizes when mpp is missing or implausible."""
+    try:
+        mpp = float(slide_mpp)
+    except (TypeError, ValueError):
+        return int(base_patch_size), int(base_step_size)
+    if not (0.05 < mpp < 5.0):
+        return int(base_patch_size), int(base_step_size)
+    scale = float(RESOLUTION.TARGET_MPP) / mpp
+    ps = max(int(round(base_patch_size * scale)), 1)
+    ss = max(int(round(base_step_size * scale)), 1)
+    return ps, ss
 
 
 def stitching(file_path, wsi_object, downscale=64):
@@ -139,11 +147,13 @@ def seg_and_patch(
         full_path = os.path.join(source, slide)
         try:
             WSI_object = WholeSlideImage(full_path)
+            slide_mpp = getattr(WSI_object.wsi, "mpp", None)
             object_power = WSI_object.object_power
-            patch_size, step_size = adjust_size(object_power)
+            cur_patch_size, cur_step_size = adjust_size(slide_mpp, patch_size, step_size)
             print("#" * 100)
             print("levels:", WSI_object.wsi.level_dimensions)
-            print("object_power: {}, patch_size: {}, step_size: {}".format(object_power, patch_size, step_size))
+            print("mpp: {}, object_power: {}, patch_size: {}, step_size: {}".format(
+                slide_mpp, object_power, cur_patch_size, cur_step_size))
             print("#" * 100)
         except Exception as e:
             print("Failed to reading:", full_path)
@@ -244,7 +254,7 @@ def seg_and_patch(
 
         patch_time_elapsed = -1  # Default time
         if patch:
-            current_patch_params.update({"patch_level": patch_level, "patch_size": patch_size, "step_size": step_size, "save_path": patch_save_dir})
+            current_patch_params.update({"patch_level": patch_level, "patch_size": cur_patch_size, "step_size": cur_step_size, "save_path": patch_save_dir})
             file_path, patch_time_elapsed = patching(
                 WSI_object=WSI_object,
                 **current_patch_params,
@@ -356,6 +366,11 @@ def mp_seg_and_patch(
             print("Failed to reading:", full_path)
             return
 
+        slide_mpp = getattr(WSI_object.wsi, "mpp", None)
+        cur_patch_size, cur_step_size = adjust_size(slide_mpp, patch_size, step_size)
+        print("mpp: {}, object_power: {}, patch_size: {}, step_size: {}".format(
+            slide_mpp, getattr(WSI_object, "object_power", None), cur_patch_size, cur_step_size))
+
         if use_default_params:
             current_vis_params = vis_params.copy()
             current_filter_params = filter_params.copy()
@@ -451,7 +466,7 @@ def mp_seg_and_patch(
 
         patch_time_elapsed = -1  # Default time
         if patch:
-            current_patch_params.update({"patch_level": patch_level, "patch_size": patch_size, "step_size": step_size, "save_path": patch_save_dir})
+            current_patch_params.update({"patch_level": patch_level, "patch_size": cur_patch_size, "step_size": cur_step_size, "save_path": patch_save_dir})
             file_path, patch_time_elapsed = patching(
                 WSI_object=WSI_object,
                 **current_patch_params,
@@ -474,6 +489,8 @@ def mp_seg_and_patch(
 
     p_pool = Pool(32)
     p_pool.map(func, list(range(total)))
+    df.to_csv(os.path.join(save_dir, "process_list_autogen.csv"), index=False)
+    return 0.0, 0.0
 
 
 parser = argparse.ArgumentParser(description="seg and patch")
