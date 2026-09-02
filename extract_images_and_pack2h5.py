@@ -5,13 +5,43 @@ import numpy as np
 from multiprocessing.pool import Pool
 import glob
 import argparse
-from wsi_core.Aslide.aslide import Slide
+from Aslide import Slide
+from PIL import Image
+
+
+COLOR_CORRECTION_FLAG = False
+
+# the slide will be skipped if the ratio of corrupted tiles is higher than this threshold
+DROP_SLIDE_THRESHOLD = 0.1
+
+# read environment variable
+if 'COLOR_CORRECTION_FLAG' in os.environ:
+    if os.environ['COLOR_CORRECTION_FLAG'].lower() in ['1', 'true', 'yes']:
+        COLOR_CORRECTION_FLAG = True
+
+if 'DROP_SLIDE_THRESHOLD' in os.environ:
+    try:
+        DROP_SLIDE_THRESHOLD = float(os.environ['DROP_SLIDE_THRESHOLD'])
+    except ValueError:
+        print('Invalid DROP_SLIDE_THRESHOLD value. Using default:', DROP_SLIDE_THRESHOLD)
 
 
 def get_wsi_handle(wsi_path):
     if not os.path.exists(wsi_path):
         raise FileNotFoundError(f'{wsi_path} is not found')
     handle = Slide(wsi_path)
+    if COLOR_CORRECTION_FLAG:
+        if hasattr(handle, 'apply_color_correction'):
+            try:
+                print('Using color correction for WSI:', wsi_path)
+                handle.apply_color_correction()
+            except Exception as e:
+                print('Failed to apply color correction for WSI:', wsi_path)
+                print('Error message:', str(e))
+        else:
+            print('Color correction flag is set but WSI has no color correction method:', wsi_path)
+            print('The reason could be that the WSI is not in a supported format for color correction.')
+    
     return handle
 
 
@@ -36,34 +66,46 @@ def read_images(arg):
     size = h5['coords'].attrs['patch_size']
     
     wsi_handle = get_wsi_handle(wsi_path)
+    total_number_of_patches = len(coors)
+    allowed_corrupted = int(DROP_SLIDE_THRESHOLD * total_number_of_patches)
+    corrupted_count = 0
     try:
         with h5py.File(save_path+'.temp', 'w') as h5_file:
-            # 创建变长数据集存储JPEG字节流
+            # create dataset for patches
             patches_dataset = h5_file.create_dataset(
                 'patches',
                 shape=(_num,),
                 maxshape=(None,),
-                dtype=h5py.vlen_dtype(np.uint8),  # 变长字节数组
+                dtype=h5py.vlen_dtype(np.uint8),  # variable-length uint8 array for JPEG bytes
                 compression='gzip',
                 compression_opts=6
             )
             
-            # 逐图像处理并存储为JPEG
+            # process each image and store as JPEG
             for i, (x, y) in enumerate(coors):
-                img = wsi_handle.read_region((x, y), level, (size, size)).convert('RGB')
+                # some tiles may be corrupted, if failed, use white image
+                if corrupted_count > allowed_corrupted:
+                    raise Exception(f'Too many corrupted tiles (> {allowed_corrupted}/{total_number_of_patches}) in {wsi_path}, skipping this slide.')
+                try:
+                    img = wsi_handle.read_region((x, y), level, (size, size)).convert('RGB')
+                except Exception as e:
+                    print(f'Warning: failed to read region at ({x}, {y}) in {wsi_path}: {e}, the level 0 size is ({wsi_handle.level_dimensions[0]})')
+                    img = Image.new('RGB', (size, size), (255, 255, 255))
+                    corrupted_count += 1
                 
-                # 将图像编码为JPEG字节流
+                # encode image as JPEG byte stream
                 with io.BytesIO() as buffer:
                     img.save(buffer, format='JPEG')
                     jpeg_bytes = buffer.getvalue()
                 
-                # 存储JPEG字节流
+                # store JPEG byte stream in dataset
                 patches_dataset[i] = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+        os.rename(save_path+'.temp', save_path)
+        print(f"{wsi_path} finished!")
+        
     except Exception as e:
         print(f'{wsi_path} failed to process: {e}')
-        return
-    os.rename(save_path+'.temp', save_path)
-    print(f"{wsi_path} finished!")
+        os.remove(save_path+'.temp')
 
 def get_wsi_path(wsi_root, h5_files, wsi_format):
     kv = {}
@@ -141,7 +183,7 @@ if __name__ == '__main__':
     save_roots = [os.path.join(save_root, i) for i in h5_files]
     args = [(h5, sr, wsi_path) for h5, wsi_path, sr in zip(h5_paths, wsi_paths, save_roots)]
 
-    mp = Pool(parser.cpu_cores)
+    mp = Pool(parser.cpu_cores, maxtasksperchild=1)
     mp.map(read_images, args)
     print('All slides have been cropped!')
 

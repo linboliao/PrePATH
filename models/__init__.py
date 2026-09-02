@@ -1,8 +1,3 @@
-import os
-
-os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
-os.environ['HF_HOME'] = './models/ckpts/huggingface'
-
 import torch
 import timm
 import numpy as np
@@ -83,19 +78,19 @@ def get_model(model_name, device, gpu_num, jit=False):
         from models.mSTAR import get_mSTAR_model
         model = get_mSTAR_model(device, __implemented_models[model_name.lower()], jit=jit)
 
-    elif model_name.lower() == 'phikon':
+    elif model_name == 'phikon':
         from models.phikon import get_phikon
         model = get_phikon(device, gpu_num)
 
-    elif model_name.lower() == 'phikon2':
+    elif model_name == 'phikon2':
         from models.phikon2 import get_model
         model = get_model(device)
 
-    elif model_name.lower() == 'virchow':
+    elif model_name == 'virchow':
         from models.virchow import get_virchow_model
         model = get_virchow_model(device)
 
-    elif model_name.lower() == 'virchow2':
+    elif model_name == 'virchow2':
         from models.virchow2 import get_virchow_model
         model = get_virchow_model(device)
 
@@ -145,22 +140,18 @@ def get_model(model_name, device, gpu_num, jit=False):
     elif model_name.lower() == 'hibou-l':
         from models.hibou_l import get_model
         model = get_model(device, gpu_num)
-
+    
     elif model_name.lower() == 'omiclip':
         from models.omiclip import get_model
         model = get_model(device, __implemented_models['omiclip'])
-
+    
     elif model_name.lower() == 'patho_clip':
         from models.patho_clip import get_model_ViT_L
         model = get_model_ViT_L(device, __implemented_models['patho_clip'])
-
-    elif model_name.lower() == 'dinov3':
-        from models.dinov3 import get_dinov3_model
-        model = get_dinov3_model(device)
-
+    
     else:
         raise NotImplementedError(f'{model_name} is not implemented')
-
+    
     if model_name in ['resnet50', 'resnet101']:
         if gpu_num > 1:
             model = torch.nn.parallel.DataParallel(model)
@@ -189,12 +180,12 @@ def get_custom_transformer(model_name):
         # Use proper preprocessing for phikon2 to avoid CPU bottleneck
         from models.phikon2 import get_phikon2_trans
         custom_trans = get_phikon2_trans()
-
+        
     elif model_name == 'phikon':
         # Use proper preprocessing for phikon to avoid CPU bottleneck
         from models.phikon import get_phikon_trans
         custom_trans = get_phikon_trans()
-
+        
     elif model_name == 'hibou-l':
         # Use proper preprocessing for hibou-l to avoid CPU bottleneck
         from models.hibou_l import get_hibou_l_trans
@@ -220,11 +211,11 @@ def get_custom_transformer(model_name):
         from models.mSTAR import get_mSTAR_trans
         custom_trans = get_mSTAR_trans()
 
-    elif model_name.lower() == 'virchow':
+    elif model_name == 'virchow':
         from models.virchow import get_virchow_trans
         custom_trans = get_virchow_trans()
 
-    elif model_name.lower() == 'virchow2':
+    elif model_name == 'virchow2':
         from models.virchow2 import get_virchow_trans
         custom_trans = get_virchow_trans()
 
@@ -272,19 +263,15 @@ def get_custom_transformer(model_name):
     elif model_name.lower() == 'lunit':
         from models.lunit import get_trans
         custom_trans = get_trans()
-
-    elif model_name.lower() == 'dinov3':
-        from models.dinov3 import get_dinov3_trans
-        custom_trans = get_dinov3_trans()
-
+    
     elif model_name.lower() == 'omiclip':
         from models.omiclip import get_trans
         custom_trans = get_trans(__implemented_models['omiclip'])
-
+    
     elif model_name.lower() == 'patho_clip':
         from models.patho_clip import get_trans_ViT_L
         custom_trans = get_trans_ViT_L(__implemented_models['patho_clip'])
-
+        
     else:
         raise NotImplementedError('Transformers for {} is not implemented ...'.format(model_name))
 

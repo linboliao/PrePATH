@@ -62,8 +62,8 @@ def save_feature_subprocess(path, feature):
 
 
 def light_compute_w_loader(file_path, wsi, model,
-                           batch_size=8, verbose=0, print_every=20, pretrained=True,
-                           custom_downsample=1, target_patch_size=-1, custom_transformer=None):
+     batch_size = 8, verbose = 0, print_every=20, pretrained=True, 
+    custom_downsample=1, target_patch_size=-1, custom_transformer=None):
     """
     Do not save features to h5 file to save storage
     args:
@@ -88,7 +88,7 @@ def light_compute_w_loader(file_path, wsi, model,
     print('Data Loader args:', kwargs)
 
     if verbose > 0:
-        print('processing {}: total of {} batches'.format(file_path, len(loader)))
+        print('processing {}: total of {} batches'.format(file_path,len(loader)))
 
     features_list = []
     coords_list = []

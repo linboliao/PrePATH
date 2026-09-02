@@ -11,6 +11,15 @@ import numpy as np
 import time
 import argparse
 import pandas as pd
+from math import ceil
+
+# WholeSlideImage wrapper functions
+def wsi_slide_image(file_path):
+    # get environment variable `ENABLE_AI_SEGMENTATION`
+    enable_ai_segmentation = int(os.getenv("ENABLE_AI_SEGMENTATION", 0))
+    threshold = float(os.getenv("AI_SEG_CONFIDENCE_THRESHOLD", 0.3))
+    batch_size = int(os.getenv("AI_SEG_BATCH_SIZE", 32))
+    return WholeSlideImage(file_path, seg_thresh=threshold, seg_batch_size=batch_size, seg_overlap=32, enable_ai_segmentation=enable_ai_segmentation)
 
 
 def adjust_size(slide_mpp, base_patch_size, base_step_size):
@@ -67,6 +76,10 @@ def patching(WSI_object, **kwargs):
 
 
 def estimate_best_seg_level(WSI_object):
+    if WSI_object.enable_ai_segmentation:
+        downsample = int(os.getenv("DOWNSAMPLE_FOR_SEGMENTATION", 64))
+        return downsample
+
     height, width = WSI_object.wsi.level_dimensions[0]
     if height > 200000 or width > 200000:
         return 256
@@ -466,7 +479,7 @@ def mp_seg_and_patch(
 
         patch_time_elapsed = -1  # Default time
         if patch:
-            current_patch_params.update({"patch_level": patch_level, "patch_size": cur_patch_size, "step_size": cur_step_size, "save_path": patch_save_dir})
+            current_patch_params.update({"patch_level": patch_level, "patch_size": patch_size, "step_size": step_size, "save_path": patch_save_dir})
             file_path, patch_time_elapsed = patching(
                 WSI_object=WSI_object,
                 **current_patch_params,
@@ -487,7 +500,7 @@ def mp_seg_and_patch(
         print("stitching took {} seconds".format(stitch_time_elapsed))
         df.loc[idx, "status"] = "processed"
 
-    p_pool = Pool(32)
+    p_pool = Pool(32, maxtasksperchild=1)
     p_pool.map(func, list(range(total)))
     df.to_csv(os.path.join(save_dir, "process_list_autogen.csv"), index=False)
     return 0.0, 0.0
