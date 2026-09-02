@@ -23,3 +23,7 @@ models/*_fm.py
 models/dinov3.py
 # JetBrains IDE
 .idea/
+
+# secrets / editor backups
+models/token
+*.bak
