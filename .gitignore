@@ -21,3 +21,5 @@ scripts/get_coors_local
 slurm_scripts/
 models/*_fm.py
 models/dinov3.py
+# JetBrains IDE
+.idea/
